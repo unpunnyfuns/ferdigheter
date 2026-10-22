@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+import argparse
+import json
 import re
+import sys
 import yaml
 from datetime import date
 from pathlib import Path
@@ -160,3 +163,71 @@ def splice_readme(text: str, table: str) -> str:
         raise ValueError("missing index markers")
     head = text[: start + len(START_MARKER)]
     return f"{head}\n{table}\n{text[end:]}"
+
+
+def render_outputs(root: Path, today: date) -> tuple[dict[Path, str], list[str]]:
+    skills, problems = load_all(root)
+    if problems:
+        return {}, problems
+    index = build_index(skills, today)
+    readme_path = root / "README.md"
+    try:
+        readme = splice_readme(readme_path.read_text(encoding="utf-8"), render_table(index["skills"]))
+    except (OSError, ValueError) as exc:
+        return {}, [f"README.md: {exc}"]
+    index_text = json.dumps(index, indent=2, ensure_ascii=False) + "\n"
+    return {root / "index.json": index_text, readme_path: readme}, []
+
+
+def _existing_generated(root: Path) -> date:
+    path = root / "index.json"
+    if path.is_file():
+        try:
+            return date.fromisoformat(json.loads(path.read_text(encoding="utf-8"))["generated"])
+        except (ValueError, KeyError, TypeError):
+            pass
+    return date.today()
+
+
+def _report(problems: list[str]) -> int:
+    for problem in problems:
+        print(problem)
+    return 1 if problems else 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("validate", help="check every skill, print problems")
+    build = sub.add_parser("build", help="validate, then write index.json and README table")
+    build.add_argument("--check", action="store_true", help="fail if outputs are out of date")
+    args = parser.parse_args(argv)
+    root = args.root.resolve()
+
+    if args.command == "validate":
+        _, problems = load_all(root)
+        return _report(problems)
+
+    today = _existing_generated(root) if args.check else date.today()
+    outputs, problems = render_outputs(root, today)
+    if problems:
+        return _report(problems)
+
+    if args.check:
+        stale = [
+            path
+            for path, content in outputs.items()
+            if not path.is_file() or path.read_text(encoding="utf-8") != content
+        ]
+        for path in stale:
+            print(f"{path.relative_to(root)} is out of date")
+        return 1 if stale else 0
+
+    for path, content in outputs.items():
+        path.write_text(content, encoding="utf-8")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

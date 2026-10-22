@@ -1,6 +1,7 @@
 import pytest
 from pathlib import Path
 from datetime import date
+import json
 
 import registry
 
@@ -182,3 +183,74 @@ def test_splice_readme_replaces_between_markers():
 def test_splice_readme_missing_markers():
     with pytest.raises(ValueError, match="markers"):
         registry.splice_readme("# T\n", "TABLE")
+
+
+README = "# Reg\n\n<!-- index:start -->\n<!-- index:end -->\n"
+
+
+def make_repo(tmp_path: Path) -> Path:
+    (tmp_path / "README.md").write_text(README, encoding="utf-8")
+    make_skill(tmp_path, "foo", "name: foo\ndescription: Does foo.\ntags: [x]\n")
+    return tmp_path
+
+
+def test_cli_validate_ok(tmp_path, capsys):
+    make_repo(tmp_path)
+    assert registry.main(["--root", str(tmp_path), "validate"]) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_cli_validate_reports_problems(tmp_path, capsys):
+    make_repo(tmp_path)
+    make_skill(tmp_path, "bad", "name: nope\ndescription: x\n")
+    assert registry.main(["--root", str(tmp_path), "validate"]) == 1
+    assert capsys.readouterr().out == "skills/bad/SKILL.md: name 'nope' does not match folder 'bad'\n"
+
+
+def test_cli_build_writes_outputs(tmp_path, capsys):
+    make_repo(tmp_path)
+    assert registry.main(["--root", str(tmp_path), "build"]) == 0
+    assert capsys.readouterr().out == ""
+    index = json.loads((tmp_path / "index.json").read_text(encoding="utf-8"))
+    assert index["generated"] == date.today().isoformat()
+    assert index["skills"][0]["name"] == "foo"
+    assert (tmp_path / "index.json").read_text(encoding="utf-8").endswith("}\n")
+    readme = (tmp_path / "README.md").read_text(encoding="utf-8")
+    assert "| [foo](skills/foo/) | Does foo. | x |" in readme
+
+
+def test_cli_build_refuses_on_problems(tmp_path):
+    make_repo(tmp_path)
+    make_skill(tmp_path, "bad", "name: nope\ndescription: x\n")
+    assert registry.main(["--root", str(tmp_path), "build"]) == 1
+    assert not (tmp_path / "index.json").exists()
+
+
+def test_cli_build_missing_markers(tmp_path, capsys):
+    make_repo(tmp_path)
+    (tmp_path / "README.md").write_text("# no markers\n", encoding="utf-8")
+    assert registry.main(["--root", str(tmp_path), "build"]) == 1
+    assert capsys.readouterr().out == "README.md: missing index markers\n"
+
+
+def test_cli_build_check(tmp_path, capsys):
+    make_repo(tmp_path)
+    assert registry.main(["--root", str(tmp_path), "build", "--check"]) == 1
+    assert capsys.readouterr().out == "index.json is out of date\nREADME.md is out of date\n"
+    assert not (tmp_path / "index.json").exists()
+
+    registry.main(["--root", str(tmp_path), "build"])
+    assert registry.main(["--root", str(tmp_path), "build", "--check"]) == 0
+
+    make_skill(tmp_path, "bar")
+    assert registry.main(["--root", str(tmp_path), "build", "--check"]) == 1
+
+
+def test_cli_build_check_keeps_existing_date(tmp_path):
+    make_repo(tmp_path)
+    registry.main(["--root", str(tmp_path), "build"])
+    index_path = tmp_path / "index.json"
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    index["generated"] = "2000-01-01"
+    index_path.write_text(json.dumps(index, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    assert registry.main(["--root", str(tmp_path), "build", "--check"]) == 0
