@@ -35,6 +35,96 @@
     "ref": "main",
     "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44"
   },
+  "process/brainstorming": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/brainstorming",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/diagnosing-superpowers": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/diagnosing-superpowers",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/dispatching-parallel-agents": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/dispatching-parallel-agents",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/executing-plans": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/executing-plans",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/finishing-a-development-branch": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/finishing-a-development-branch",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/receiving-code-review": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/receiving-code-review",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/requesting-code-review": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/requesting-code-review",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/subagent-driven-development": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/subagent-driven-development",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/systematic-debugging": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/systematic-debugging",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/test-driven-development": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/test-driven-development",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/using-git-worktrees": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/using-git-worktrees",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/using-superpowers": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/using-superpowers",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/verification-before-completion": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/verification-before-completion",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/writing-plans": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/writing-plans",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "process/writing-skills": {
+    "repo": "https://github.com/obra/superpowers",
+    "path": "skills/writing-skills",
+    "ref": "main",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
   "python/pytest-skill": {
     "repo": "https://github.com/LambdaTest/agent-skills",
     "path": "pytest-skill",

@@ -2,6 +2,18 @@
   "generated": "2026-10-22",
   "skills": [
     {
+      "name": "brainstorming",
+      "category": "process",
+      "description": "You MUST use this before any creative work - creating features, building components, adding functionality, modifying behavior, or planning anything new, in software or out of it (a talk, a business, a renovation).",
+      "path": "skills/process/brainstorming",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "design"
+      ]
+    },
+    {
       "name": "cdrf-expert",
       "category": "django",
       "description": "Expert guidance for Django REST Framework class-based views using Classy DRF (https://www.cdrf.co). Use when selecting or debugging APIView, GenericAPIView, concrete generic views, mixin combinations, or ViewSet/GenericViewSet/ModelViewSet behavior; tracing method resolution order (MRO); understanding which method to override (`create` vs `perform_create`, `update` vs `perform_update`, `destroy` vs `perform_destroy`, `get_queryset`, `get_serializer_class`); and comparing behavior across DRF versions. Do not use for function-based views, GraphQL, FastAPI/Flask, frontend work, or non-DRF backend frameworks.",
@@ -13,6 +25,30 @@
         "drf",
         "python",
         "needs-network"
+      ]
+    },
+    {
+      "name": "diagnosing-superpowers",
+      "category": "process",
+      "description": "Use when a superpowers session went wrong and your human partner wants to know why — repeated work, ignored plans, stumbles, poor results, a skill that didn't fire, \"it took too long\", \"why is it so expensive\", \"what is it doing\" — or wants to build a bug report for the superpowers maintainers, for the current session or a past one identified by id or path, on any harness.",
+      "path": "skills/process/diagnosing-superpowers",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "debugging"
+      ]
+    },
+    {
+      "name": "dispatching-parallel-agents",
+      "category": "process",
+      "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies",
+      "path": "skills/process/dispatching-parallel-agents",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "agents"
       ]
     },
     {
@@ -68,6 +104,30 @@
       ]
     },
     {
+      "name": "executing-plans",
+      "category": "process",
+      "description": "Use when executing an implementation plan in the current session as the implementer yourself — your human partner chose inline execution, or no subagent tool is available",
+      "path": "skills/process/executing-plans",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "planning"
+      ]
+    },
+    {
+      "name": "finishing-a-development-branch",
+      "category": "process",
+      "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work",
+      "path": "skills/process/finishing-a-development-branch",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "git"
+      ]
+    },
+    {
       "name": "mcp-builder",
       "category": "mcp",
       "description": "Guide for creating high-quality MCP (Model Context Protocol) servers that enable LLMs to interact with external services through well-designed tools. Use when building MCP servers to integrate external APIs or services, whether in Python (FastMCP) or Node/TypeScript (MCP SDK).",
@@ -97,6 +157,91 @@
         "author": "TestMu AI",
         "version": "1.0"
       }
+    },
+    {
+      "name": "receiving-code-review",
+      "category": "process",
+      "description": "Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation",
+      "path": "skills/process/receiving-code-review",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "review"
+      ]
+    },
+    {
+      "name": "requesting-code-review",
+      "category": "process",
+      "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements",
+      "path": "skills/process/requesting-code-review",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "review"
+      ]
+    },
+    {
+      "name": "subagent-driven-development",
+      "category": "process",
+      "description": "Use when executing implementation plans with independent tasks in the current session",
+      "path": "skills/process/subagent-driven-development",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "agents",
+        "planning"
+      ]
+    },
+    {
+      "name": "systematic-debugging",
+      "category": "process",
+      "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes",
+      "path": "skills/process/systematic-debugging",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "debugging"
+      ]
+    },
+    {
+      "name": "test-driven-development",
+      "category": "process",
+      "description": "Use when implementing any feature or bugfix, before writing implementation code",
+      "path": "skills/process/test-driven-development",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "testing"
+      ]
+    },
+    {
+      "name": "using-git-worktrees",
+      "category": "process",
+      "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback",
+      "path": "skills/process/using-git-worktrees",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "git"
+      ]
+    },
+    {
+      "name": "using-superpowers",
+      "category": "process",
+      "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions",
+      "path": "skills/process/using-superpowers",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "meta"
+      ]
     },
     {
       "name": "vercel-composition-patterns",
@@ -133,6 +278,18 @@
       }
     },
     {
+      "name": "verification-before-completion",
+      "category": "process",
+      "description": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always",
+      "path": "skills/process/verification-before-completion",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "quality"
+      ]
+    },
+    {
       "name": "web-design-guidelines",
       "category": "web",
       "description": "Review UI code for Web Interface Guidelines compliance. Use when asked to \"review my UI\", \"check accessibility\", \"audit design\", \"review UX\", or \"check my site against best practices\".",
@@ -150,6 +307,30 @@
         "version": "1.0.0",
         "argument-hint": "<file-or-pattern>"
       }
+    },
+    {
+      "name": "writing-plans",
+      "category": "process",
+      "description": "Use when you have a spec or requirements for a multi-step task, before touching code",
+      "path": "skills/process/writing-plans",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "planning"
+      ]
+    },
+    {
+      "name": "writing-skills",
+      "category": "process",
+      "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment",
+      "path": "skills/process/writing-skills",
+      "license": "MIT",
+      "source": "https://github.com/obra/superpowers",
+      "tags": [
+        "process",
+        "meta"
+      ]
     }
   ]
 }
