@@ -870,6 +870,11 @@ def test_license_text_unknown():
     assert registry.license_text("WTFPL", "x") is None
 
 
+def test_license_text_rejects_path_like_spdx():
+    assert registry.license_text("../../requirements", "x") is None
+    assert registry.license_text("MIT/../x", "x") is None
+
+
 def test_has_license_file(tmp_path):
     assert not registry.has_license_file(tmp_path)
     (tmp_path / "license.md").write_text("x", encoding="utf-8")

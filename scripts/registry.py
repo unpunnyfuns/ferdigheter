@@ -25,6 +25,7 @@ START_MARKER = "<!-- index:start -->"
 END_MARKER = "<!-- index:end -->"
 VENDOR_FILE = "vendor.json"
 KEY_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$")
+SPDX_RE = re.compile(r"^[A-Za-z0-9.+-]+$")
 LICENSE_DIR = Path(__file__).resolve().parent / "licenses"
 
 
@@ -320,6 +321,8 @@ def parse_tags(text: str) -> list[str]:
 
 
 def license_text(spdx: str, copyright: str | None) -> str | None:
+    if not SPDX_RE.match(spdx):
+        return None
     template = LICENSE_DIR / f"{spdx}.txt"
     if not template.is_file():
         return None
