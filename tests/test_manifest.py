@@ -1,8 +1,12 @@
 import pytest
 
 from conftest import make_skill, write_manifest_file
-from ferdigheter.commands import _sync_entry_problems
-from ferdigheter.manifest import load_manifest, validate_manifest, write_manifest
+from ferdigheter.manifest import (
+    _sync_entry_problems,
+    load_manifest,
+    validate_manifest,
+    write_manifest,
+)
 from ferdigheter.skills import load_all
 
 

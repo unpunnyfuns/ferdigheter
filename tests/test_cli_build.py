@@ -39,6 +39,13 @@ def test_cli_build_refuses_on_problems(tmp_path):
     assert not (tmp_path / "index.json").exists()
 
 
+def test_cli_build_missing_markers(tmp_path, capsys):
+    make_repo(tmp_path)
+    (tmp_path / "CATALOG.md").write_text("# no markers\n", encoding="utf-8")
+    assert main(["--root", str(tmp_path), "build"]) == 1
+    assert capsys.readouterr().out == "CATALOG.md: missing index markers\n"
+
+
 def test_cli_build_check(tmp_path, capsys):
     make_repo(tmp_path)
     assert main(["--root", str(tmp_path), "build", "--check"]) == 1

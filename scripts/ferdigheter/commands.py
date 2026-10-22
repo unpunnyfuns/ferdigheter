@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import subprocess
 from datetime import date
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
-from .manifest import VENDOR_FILE, _entry_complete, load_manifest, write_manifest
-from .model import KEY_RE, SKILL_FILE, FrontmatterError
+from .manifest import VENDOR_FILE, _sync_entry_problems, load_manifest, write_manifest
+from .model import SKILL_FILE, FrontmatterError
 from .render import _existing_generated, render_outputs
 from .skills import discover
 from .vendor import (
@@ -53,17 +53,6 @@ def run_build(root: Path, check: bool) -> int:
     for path, content in outputs.items():
         path.write_text(content, encoding="utf-8")
     return 0
-
-
-def _sync_entry_problems(key: str, entry: object) -> list[str]:
-    if not KEY_RE.match(key):
-        return [f"{VENDOR_FILE}: key {key!r} is not <category>/<name>"]
-    if not _entry_complete(entry):
-        return [f"{VENDOR_FILE}: {key!r} needs repo, path and ref"]
-    path = PurePosixPath(entry["path"])
-    if path.is_absolute() or ".." in path.parts:
-        return [f"{VENDOR_FILE}: {key!r} path must be a relative path inside the repo"]
-    return []
 
 
 def _sync_check(manifest: dict, keys: list[str]) -> int:

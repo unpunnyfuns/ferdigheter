@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from .model import KEY_RE, Skill, skill_label
 
@@ -49,3 +49,14 @@ def validate_manifest(root: Path, manifest: dict, skills: list[Skill]) -> list[s
         if "source" in skill.data and f"{skill.category}/{skill.dirname}" not in manifest:
             problems.append(f"{skill_label(skill)}: has source but no vendor.json entry")
     return problems
+
+
+def _sync_entry_problems(key: str, entry: object) -> list[str]:
+    if not KEY_RE.match(key):
+        return [f"{VENDOR_FILE}: key {key!r} is not <category>/<name>"]
+    if not _entry_complete(entry):
+        return [f"{VENDOR_FILE}: {key!r} needs repo, path and ref"]
+    path = PurePosixPath(entry["path"])
+    if path.is_absolute() or ".." in path.parts:
+        return [f"{VENDOR_FILE}: {key!r} path must be a relative path inside the repo"]
+    return []
