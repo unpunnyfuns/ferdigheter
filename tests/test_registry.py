@@ -2,6 +2,7 @@ import pytest
 from pathlib import Path
 from datetime import date
 import json
+import subprocess
 
 import registry
 
@@ -428,3 +429,124 @@ def test_load_all_includes_manifest_problems(tmp_path):
         "vendor.json: 'misc/gone' has no skill folder",
         "skills/misc/foo/SKILL.md: has source but no vendor.json entry",
     ]
+
+
+def git(cwd: Path, *args: str) -> str:
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True).stdout.strip()
+
+
+def init_repo(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    git(path, "init", "-q", "-b", "main")
+    git(path, "config", "user.email", "test@example.com")
+    git(path, "config", "user.name", "Test")
+
+
+def commit_all(path: Path, message: str) -> str:
+    git(path, "add", "-A")
+    git(path, "commit", "-q", "-m", message)
+    return git(path, "rev-parse", "HEAD")
+
+
+UPSTREAM_V1 = "---\nname: foo\ndescription: Upstream v1.\nlicense: Complete terms in LICENSE.txt\n---\n\n# Foo v1\n"
+
+
+def make_upstream(tmp_path: Path, text: str = UPSTREAM_V1, extra: dict[str, str] | None = None) -> tuple[str, str]:
+    repo = tmp_path / "upstream"
+    init_repo(repo)
+    skill = repo / "skills" / "foo"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(text, encoding="utf-8")
+    for name, content in (extra or {}).items():
+        (skill / name).write_text(content, encoding="utf-8")
+    sha = commit_all(repo, "v1")
+    return f"file://{repo}", sha
+
+
+def test_dump_frontmatter_round_trip():
+    text = "---\nname: foo\ndescription: 'Quoted: yes'\ntags:\n- a\n---\n\n# Body\n"
+    data, body = registry.parse_frontmatter(text)
+    assert registry.parse_frontmatter(registry.dump_frontmatter(data, body)) == (data, body)
+
+
+def test_merge_frontmatter_appends_registry_fields_last():
+    merged = registry.merge_frontmatter(UPSTREAM_V1, {"license": "MIT", "source": "https://x", "tags": ["a"]})
+    data, body = registry.parse_frontmatter(merged)
+    assert list(data) == ["name", "description", "license", "source", "tags"]
+    assert data["license"] == "MIT"
+    assert body == "\n# Foo v1\n"
+
+
+def test_merge_frontmatter_without_overrides_drops_upstream_registry_fields():
+    data, _ = registry.parse_frontmatter(registry.merge_frontmatter(UPSTREAM_V1, {}))
+    assert "license" not in data
+
+
+def test_fetch_upstream_and_remote_commit(tmp_path):
+    url, sha = make_upstream(tmp_path)
+    dest = tmp_path / "clone"
+    assert registry.fetch_upstream(url, "main", dest) == sha
+    assert (dest / "skills" / "foo" / "SKILL.md").is_file()
+    assert registry.remote_commit(url, "main") == sha
+
+
+def test_remote_commit_unknown_ref(tmp_path):
+    url, _ = make_upstream(tmp_path)
+    with pytest.raises(subprocess.CalledProcessError):
+        registry.remote_commit(url, "nope")
+
+
+def test_replace_skill_keeps_registry_fields_and_license(tmp_path):
+    skill_dir = make_skill(tmp_path, "foo", "name: foo\ndescription: Old.\nlicense: MIT\nsource: https://x\ntags: [a]\n")
+    (skill_dir / "LICENSE").write_text("MIT text\n", encoding="utf-8")
+    (skill_dir / "stale.md").write_text("old\n", encoding="utf-8")
+    upstream = tmp_path / "up"
+    upstream.mkdir()
+    (upstream / "SKILL.md").write_text(UPSTREAM_V1, encoding="utf-8")
+    (upstream / "reference.md").write_text("new\n", encoding="utf-8")
+    registry.replace_skill(skill_dir, upstream)
+    data, body = registry.parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
+    assert data == {"name": "foo", "description": "Upstream v1.", "license": "MIT", "source": "https://x", "tags": ["a"]}
+    assert body == "\n# Foo v1\n"
+    assert (skill_dir / "LICENSE").read_text(encoding="utf-8") == "MIT text\n"
+    assert (skill_dir / "reference.md").is_file()
+    assert not (skill_dir / "stale.md").exists()
+
+
+def test_replace_skill_prefers_upstream_license(tmp_path):
+    skill_dir = make_skill(tmp_path, "foo")
+    (skill_dir / "LICENSE").write_text("ours\n", encoding="utf-8")
+    upstream = tmp_path / "up"
+    upstream.mkdir()
+    (upstream / "SKILL.md").write_text(UPSTREAM_V1, encoding="utf-8")
+    (upstream / "LICENSE").write_text("theirs\n", encoding="utf-8")
+    registry.replace_skill(skill_dir, upstream)
+    assert (skill_dir / "LICENSE").read_text(encoding="utf-8") == "theirs\n"
+
+
+def test_sync_skill_creates_missing_folder(tmp_path):
+    url, sha = make_upstream(tmp_path)
+    root = tmp_path / "reg"
+    root.mkdir()
+    entry = {"repo": url, "path": "skills/foo", "ref": "main"}
+    assert registry.sync_skill(root, "misc/foo", entry) == sha
+    data, _ = registry.parse_frontmatter((root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8"))
+    assert data == {"name": "foo", "description": "Upstream v1."}
+
+
+def test_sync_skill_missing_path(tmp_path):
+    url, _ = make_upstream(tmp_path)
+    entry = {"repo": url, "path": "skills/nope", "ref": "main"}
+    with pytest.raises(FileNotFoundError, match=r"path 'skills/nope' not found in file://.*@main"):
+        registry.sync_skill(tmp_path / "reg", "misc/foo", entry)
+
+
+def test_sync_skill_path_without_skill_md(tmp_path):
+    url, _ = make_upstream(tmp_path)
+    repo = tmp_path / "upstream"
+    (repo / "docs").mkdir()
+    (repo / "docs" / "x.md").write_text("x\n", encoding="utf-8")
+    commit_all(repo, "docs")
+    entry = {"repo": url, "path": "docs", "ref": "main"}
+    with pytest.raises(FileNotFoundError, match="path 'docs' has no SKILL.md"):
+        registry.sync_skill(tmp_path / "reg", "misc/foo", entry)

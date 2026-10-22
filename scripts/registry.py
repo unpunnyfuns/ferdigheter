@@ -6,7 +6,10 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import yaml
 from datetime import date
 from pathlib import Path
@@ -17,6 +20,7 @@ NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 MAX_NAME = 64
 MAX_DESCRIPTION = 1024
 OPTIONAL_FIELDS = ("license", "source", "tags", "metadata")
+REGISTRY_FIELDS = ("license", "source", "tags")
 START_MARKER = "<!-- index:start -->"
 END_MARKER = "<!-- index:end -->"
 VENDOR_FILE = "vendor.json"
@@ -216,6 +220,71 @@ def validate_manifest(root: Path, manifest: dict, skills: list[Skill]) -> list[s
         if "source" in skill.data and f"{skill.category}/{skill.dirname}" not in manifest:
             problems.append(f"{skill_label(skill)}: has source but no vendor.json entry")
     return problems
+
+
+def dump_frontmatter(data: dict, body: str) -> str:
+    raw = yaml.safe_dump(data, sort_keys=False, allow_unicode=True, width=10_000)
+    return f"---\n{raw}---\n{body}"
+
+
+def registry_fields(data: dict) -> dict:
+    return {key: data[key] for key in REGISTRY_FIELDS if key in data}
+
+
+def merge_frontmatter(upstream_text: str, overrides: dict) -> str:
+    data, body = parse_frontmatter(upstream_text)
+    upstream_only = {key: value for key, value in data.items() if key not in REGISTRY_FIELDS}
+    return dump_frontmatter({**upstream_only, **registry_fields(overrides)}, body)
+
+
+def _git(*args: str, cwd: Path | None = None) -> str:
+    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True)
+    return result.stdout.strip()
+
+
+def fetch_upstream(repo: str, ref: str, dest: Path) -> str:
+    _git("clone", "--quiet", "--depth", "1", "--branch", ref, repo, str(dest))
+    return _git("rev-parse", "HEAD", cwd=dest)
+
+
+def remote_commit(repo: str, ref: str) -> str:
+    output = _git("ls-remote", repo, f"refs/heads/{ref}", f"refs/tags/{ref}")
+    if not output:
+        raise subprocess.CalledProcessError(1, ["git", "ls-remote"], stderr=f"ref {ref!r} not found in {repo}")
+    return output.split()[0]
+
+
+def replace_skill(skill_dir: Path, upstream_dir: Path) -> None:
+    old_skill_md = skill_dir / "SKILL.md"
+    overrides = {}
+    if old_skill_md.is_file():
+        overrides = registry_fields(parse_frontmatter(old_skill_md.read_text(encoding="utf-8"))[0])
+    old_license = skill_dir / "LICENSE"
+    kept_license = None
+    if old_license.is_file() and not (upstream_dir / "LICENSE").exists():
+        kept_license = old_license.read_bytes()
+    shutil.rmtree(skill_dir, ignore_errors=True)
+    shutil.copytree(upstream_dir, skill_dir)
+    new_skill_md = skill_dir / "SKILL.md"
+    merged = merge_frontmatter(new_skill_md.read_text(encoding="utf-8"), overrides)
+    new_skill_md.write_text(merged, encoding="utf-8")
+    if kept_license is not None:
+        (skill_dir / "LICENSE").write_bytes(kept_license)
+
+
+def sync_skill(root: Path, key: str, entry: dict) -> str:
+    with tempfile.TemporaryDirectory() as tmp:
+        clone = Path(tmp) / "upstream"
+        commit = fetch_upstream(entry["repo"], entry["ref"], clone)
+        upstream_dir = clone / entry["path"]
+        if not upstream_dir.is_dir():
+            raise FileNotFoundError(
+                f"path {entry['path']!r} not found in {entry['repo']}@{entry['ref']}"
+            )
+        if not (upstream_dir / "SKILL.md").is_file():
+            raise FileNotFoundError(f"path {entry['path']!r} has no SKILL.md")
+        replace_skill(root / "skills" / key, upstream_dir)
+    return commit
 
 
 def index_entry(skill: Skill) -> dict:
