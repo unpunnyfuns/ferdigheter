@@ -8,16 +8,19 @@
   "web/vercel-composition-patterns": {
     "repo": "https://github.com/vercel-labs/agent-skills",
     "path": "skills/composition-patterns",
-    "ref": "main"
+    "ref": "main",
+    "commit": "063bee94c3f4df8453406c830b0a7df0f2860278"
   },
   "web/vercel-react-best-practices": {
     "repo": "https://github.com/vercel-labs/agent-skills",
     "path": "skills/react-best-practices",
-    "ref": "main"
+    "ref": "main",
+    "commit": "063bee94c3f4df8453406c830b0a7df0f2860278"
   },
   "web/web-design-guidelines": {
     "repo": "https://github.com/vercel-labs/agent-skills",
     "path": "skills/web-design-guidelines",
-    "ref": "main"
+    "ref": "main",
+    "commit": "063bee94c3f4df8453406c830b0a7df0f2860278"
   }
 }
