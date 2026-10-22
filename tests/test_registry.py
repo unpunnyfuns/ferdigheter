@@ -108,6 +108,16 @@ def test_validate_full_optional_fields():
         ("foo", {"name": "foo", "description": "x", "tags": "a"}, "tags must be"),
         ("foo", {"name": "foo", "description": "x", "tags": ["Bad Tag"]}, "tags must be"),
         ("foo", {"name": "foo", "description": "x", "metadata": []}, "metadata must be"),
+        (
+            "foo",
+            {"name": "foo", "description": "x", "metadata": {"released": date(2026, 1, 1)}},
+            "metadata must be JSON-serializable",
+        ),
+        (
+            "foo",
+            {"name": "foo", "description": "x <!-- index:end -->"},
+            "description must not contain HTML comments",
+        ),
     ],
 )
 def test_validate_problems(dirname, data, message):

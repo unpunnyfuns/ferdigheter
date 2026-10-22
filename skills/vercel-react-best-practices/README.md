@@ -9,7 +9,6 @@ A structured repository for creating and maintaining React Best Practices optimi
   - `_template.md` - Template for creating new rules
   - `area-description.md` - Individual rule files
 - `src/` - Build scripts and utilities
-- `metadata.json` - Document metadata (version, organization, abstract)
 - __`AGENTS.md`__ - Compiled output (generated)
 - __`test-cases.json`__ - Test cases for LLM evaluation (generated)
 

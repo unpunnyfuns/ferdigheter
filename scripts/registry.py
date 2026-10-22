@@ -85,6 +85,8 @@ def validate_skill(skill: Skill) -> list[str]:
         problems.append("description is required")
     elif len(description.strip()) > MAX_DESCRIPTION:
         problems.append(f"description is longer than {MAX_DESCRIPTION} chars")
+    elif "<!--" in description:
+        problems.append("description must not contain HTML comments")
 
     if "license" in data:
         license_ = data["license"]
@@ -104,8 +106,14 @@ def validate_skill(skill: Skill) -> list[str]:
         if not valid_tags:
             problems.append("tags must be a list of kebab-case strings")
 
-    if "metadata" in data and not isinstance(data["metadata"], dict):
-        problems.append("metadata must be a mapping")
+    if "metadata" in data:
+        if not isinstance(data["metadata"], dict):
+            problems.append("metadata must be a mapping")
+        else:
+            try:
+                json.dumps(data["metadata"])
+            except TypeError:
+                problems.append("metadata must be JSON-serializable")
 
     return problems
 

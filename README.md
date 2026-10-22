@@ -21,10 +21,9 @@ git clone https://github.com/<owner>/ferdigheter
 
 ### Hermes Agent
 
-Hermes installs straight from a GitHub path, or you can add this repo as a tap:
+Hermes can add this repo as a tap:
 
 ```sh
-hermes skills install <owner>/ferdigheter/skills/<name>
 hermes skills tap add <owner>/ferdigheter
 ```
 
@@ -47,7 +46,7 @@ Or point `opencode.json` at a clone of this repo:
 
 ### Claude Code and others
 
-Copy into `~/.claude/skills/<name>` or `.claude/skills/<name>`. OpenCode and Hermes also read `.agents/skills/<name>`, so that path works for all three.
+Copy into `~/.claude/skills/<name>` or `.claude/skills/<name>`. OpenCode and Hermes also read `.agents/skills/<name>`; Claude Code does not.
 
 ### Machine-readable index
 
