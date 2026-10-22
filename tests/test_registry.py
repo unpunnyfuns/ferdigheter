@@ -120,7 +120,8 @@ def test_validate_full_optional_fields():
         ("foo", {"name": "foo", "description": "  "}, "description is required"),
         ("foo", {"name": "foo", "description": "x" * 1025}, "longer than 1024"),
         ("foo", {"name": "foo", "description": "x", "license": ""}, "license must be"),
-        ("foo", {"name": "foo", "description": "x", "source": "http://x"}, "source must be"),
+        ("foo", {"name": "foo", "description": "x", "source": ""}, "source must be"),
+        ("foo", {"name": "foo", "description": "x", "source": 3}, "source must be"),
         ("foo", {"name": "foo", "description": "x", "tags": "a"}, "tags must be"),
         ("foo", {"name": "foo", "description": "x", "tags": ["Bad Tag"]}, "tags must be"),
         ("foo", {"name": "foo", "description": "x", "metadata": []}, "metadata must be"),
@@ -964,9 +965,13 @@ def test_cli_add_skips_license_when_upstream_has_one(tmp_path, capsys):
         "skills/foo",
         "--license",
         "MIT",
+        "--copyright",
+        "x",
     ]
     assert registry.main(argv) == 0
-    assert "wrote" not in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "wrote" not in out
+    assert "LICENSE:" not in out
     assert not (root / "skills" / "misc" / "foo" / "LICENSE").exists()
     skill_md = root / "skills" / "misc" / "foo" / "SKILL.md"
     data, _ = registry.parse_frontmatter(skill_md.read_text(encoding="utf-8"))
@@ -1075,3 +1080,103 @@ def test_cli_add_git_failure_leaves_no_manifest_entry(tmp_path, capsys):
     assert registry.main(argv) == 1
     assert capsys.readouterr().out.startswith("misc/foo: git clone failed: ")
     assert not (root / "vendor.json").exists()
+
+
+def test_cli_add_sets_name_from_key(tmp_path, capsys):
+    url, _ = make_upstream(tmp_path)
+    root = make_bare_registry(tmp_path)
+    argv = [
+        "--root",
+        str(root),
+        "add",
+        "misc/vercel-foo",
+        "--repo",
+        url,
+        "--path",
+        "skills/foo",
+        "--license",
+        "MIT",
+        "--copyright",
+        "2025 Up",
+    ]
+    assert registry.main(argv) == 0
+    skill_md = root / "skills" / "misc" / "vercel-foo" / "SKILL.md"
+    data, _ = registry.parse_frontmatter(skill_md.read_text(encoding="utf-8"))
+    assert data["name"] == "vercel-foo"
+    capsys.readouterr()
+    assert registry.main(["--root", str(root), "validate"]) == 0
+    assert "| [vercel-foo](skills/misc/vercel-foo/) |" in (root / "README.md").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_cli_add_rejects_empty_license(tmp_path, capsys):
+    url, _ = make_upstream(tmp_path)
+    root = make_bare_registry(tmp_path)
+    argv = [
+        "--root",
+        str(root),
+        "add",
+        "misc/foo",
+        "--repo",
+        url,
+        "--path",
+        "skills/foo",
+        "--license",
+        "",
+    ]
+    assert registry.main(argv) == 1
+    assert capsys.readouterr().out == "license must be a non-empty string\n"
+    assert not (root / "vendor.json").exists()
+    assert not (root / "skills" / "misc" / "foo").exists()
+
+
+def test_cli_add_rejects_name_used_in_another_category(tmp_path, capsys):
+    url, _ = make_upstream(tmp_path)
+    root = make_bare_registry(tmp_path)
+    make_skill(root, "foo", category="other")
+    commit_all(root, "existing foo")
+    argv = [
+        "--root",
+        str(root),
+        "add",
+        "misc/foo",
+        "--repo",
+        url,
+        "--path",
+        "skills/foo",
+        "--license",
+        "MIT",
+    ]
+    assert registry.main(argv) == 1
+    assert (
+        capsys.readouterr().out == "skills/misc/foo: name 'foo' already used in skills/other/foo\n"
+    )
+    assert not (root / "vendor.json").exists()
+    assert not (root / "skills" / "misc" / "foo").exists()
+
+
+def test_cli_add_prints_cleanup_hint_when_build_fails(tmp_path, capsys):
+    text = "---\nname: foo\ndescription: " + "x" * 1025 + "\n---\n\n# Foo\n"
+    url, _ = make_upstream(tmp_path, text=text)
+    root = make_bare_registry(tmp_path)
+    argv = [
+        "--root",
+        str(root),
+        "add",
+        "misc/foo",
+        "--repo",
+        url,
+        "--path",
+        "skills/foo",
+        "--license",
+        "MIT",
+        "--copyright",
+        "2025 Up",
+    ]
+    assert registry.main(argv) == 1
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[-1] == (
+        "skills/misc/foo: added but validation failed; clean up with: "
+        "rm -rf skills/misc/foo and remove the entry from vendor.json"
+    )

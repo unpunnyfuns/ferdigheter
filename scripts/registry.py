@@ -119,8 +119,8 @@ def validate_skill(skill: Skill) -> list[str]:
 
     if "source" in data:
         source = data["source"]
-        if not isinstance(source, str) or not source.startswith(("https://", "file://")):
-            problems.append("source must be an https:// URL")
+        if not isinstance(source, str) or not source.strip():
+            problems.append("source must be a non-empty string")
 
     if "tags" in data:
         tags = data["tags"]
@@ -527,6 +527,14 @@ def run_sync(root: Path, keys: list[str], check: bool) -> int:
     return run_build(root, check=False)
 
 
+def _name_in_other_category(root: Path, key: str) -> str | None:
+    category, name = key.split("/")
+    for skill_dir in discover(root):
+        if skill_dir.name == name and skill_dir.parent.name != category:
+            return skill_dir.parent.name
+    return None
+
+
 def run_add(
     root: Path,
     key: str,
@@ -553,6 +561,14 @@ def run_add(
         tags = parse_tags(tags_text)
     except ValueError as exc:
         return _report([str(exc)])
+    if not spdx.strip():
+        return _report(["license must be a non-empty string"])
+    name = key.split("/")[1]
+    other_category = _name_in_other_category(root, key)
+    if other_category:
+        return _report(
+            [f"skills/{key}: name {name!r} already used in skills/{other_category}/{name}"]
+        )
     try:
         commit = sync_skill(root, key, entry)
     except subprocess.CalledProcessError as exc:
@@ -562,19 +578,27 @@ def run_add(
     print(f"{key}: none -> {_short(commit)}")
     manifest[key] = {**entry, "commit": commit}
     write_manifest(root, manifest)
-    fields = {"license": spdx, "source": repo}
+    fields = {"name": name, "license": spdx, "source": repo}
     if tags:
         fields["tags"] = tags
     set_registry_fields(skill_dir / "SKILL.md", fields)
     if not has_license_file(skill_dir):
         _write_license(skill_dir, key, spdx, copyright)
-    return run_build(root, check=False)
+    code = run_build(root, check=False)
+    if code:
+        print(
+            f"skills/{key}: added but validation failed; clean up with: "
+            f"rm -rf skills/{key} and remove the entry from vendor.json"
+        )
+    return code
 
 
 def _write_license(skill_dir: Path, key: str, spdx: str, copyright: str | None) -> None:
     try:
         text = license_text(spdx, copyright)
-    except ValueError:
+    except ValueError as exc:
+        if str(exc) != "copyright required":
+            raise
         print(f"skills/{key}/LICENSE: not written, pass --copyright")
         return
     if text is None:

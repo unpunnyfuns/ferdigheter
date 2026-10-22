@@ -10,25 +10,35 @@ Registry of agent skills in the [Agent Skills](https://agentskills.io) format. A
 | `skills/_template/` | Starting point for a new skill |
 | `index.json` | Generated machine-readable index |
 | `vendor.json` | Upstream repo, path, ref and last-synced commit for every vendored skill |
-| `scripts/registry.py` | Validates skills, generates `index.json` and the table below |
+| `scripts/registry.py` | Validates skills, generates `index.json` and the table below, vendors and updates third-party skills |
+| `scripts/licenses/` | License templates used by `add` |
 
 ## Using a skill
 
-Every skill is a folder with a `SKILL.md`, grouped by category. Copy or symlink the skill folder into wherever your agent looks for skills.
+Every skill is a folder with a `SKILL.md`, grouped by category.
 
-```sh
-git clone https://github.com/<owner>/ferdigheter
-```
+1. Clone the repo:
+
+   ```bash
+   # clone the registry
+   git clone https://github.com/<owner>/ferdigheter
+   ```
+
+2. Copy or symlink the skill folder into wherever your agent looks for skills.
 
 ### Hermes Agent
 
 Hermes can add this repo as a tap:
 
-```sh
+```bash
+# add this repo as a Hermes tap
 hermes skills tap add <owner>/ferdigheter
 ```
 
-Manual: copy `skills/<category>/<name>` into `~/.hermes/skills/<category>/<name>` (global) or `.hermes/skills/<category>/<name>` (project). The layout maps one-to-one. Project skills need `hermes skills trust` before they load.
+Manual install:
+
+1. Copy `skills/<category>/<name>` into `~/.hermes/skills/<category>/<name>` (global) or `.hermes/skills/<category>/<name>` (project). The layout maps one-to-one.
+2. Project skills need `hermes skills trust` before they load.
 
 ### OpenCode
 
@@ -53,7 +63,8 @@ Copy `skills/<category>/<name>` into `~/.claude/skills/<name>` or `.claude/skill
 
 ### Machine-readable index
 
-```sh
+```bash
+# list every indexed skill
 curl -s https://raw.githubusercontent.com/<owner>/ferdigheter/main/index.json | jq '.skills[] | {name, category, description, path}'
 ```
 
@@ -90,8 +101,16 @@ Each entry has `name`, `category`, `description`, `path`, and optionally `licens
 ## Adding a skill
 
 1. `cp -R skills/_template skills/<category>/<name>`. Reuse an existing category folder or create a new kebab-case one.
-2. Edit `skills/<category>/<name>/SKILL.md`. `name` must equal the folder name, lowercase kebab-case. `description` is required. Third-party skills get `license` and `source`.
-3. `pip install -r requirements.txt && python3 scripts/registry.py build`
+2. Edit `skills/<category>/<name>/SKILL.md`. `name` must equal the folder name, lowercase kebab-case. `description` is required. For third-party skills use the `add` command instead, see [CONTRIBUTING.md](CONTRIBUTING.md).
+3. Build the index:
+
+   ```bash
+   # install the runtime deps
+   pip install -r requirements.txt
+   # regenerate index.json and the README table
+   python3 scripts/registry.py build
+   ```
+
 4. Commit the folder plus the regenerated `index.json` and `README.md`.
 
 Details in [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -102,9 +121,12 @@ New third-party skills are added with `add`; see CONTRIBUTING.
 
 Needs network access; run it where you have it, then commit and push to the mirror.
 
-```sh
+```bash
+# report entries with newer upstream commits
 python3 scripts/registry.py sync --check
+# sync every vendored skill
 python3 scripts/registry.py sync
+# sync one vendored skill
 python3 scripts/registry.py sync web/vercel-react-best-practices
 ```
 
@@ -116,6 +138,15 @@ The registry owns four frontmatter fields: `name`, `license`, `source` and `tags
 
 If a sync aborts partway, restore the affected skill with:
 
-```sh
+```bash
+# restore the skill folder and the manifest
 git checkout -- skills/<category>/<name> vendor.json
+```
+
+If an `add` stops partway, undo it by hand:
+
+```bash
+# remove the half-vendored folder
+rm -rf skills/<category>/<name>
+# then delete its entry from vendor.json
 ```

@@ -8,8 +8,10 @@
 4. Add `tags` if useful. Use `needs-network` for skills that fetch from the web at runtime; this registry is mirrored to offline environments.
 5. Regenerate the index:
 
-   ```sh
+   ```bash
+   # install the runtime deps
    pip install -r requirements.txt
+   # regenerate index.json and the README table
    python3 scripts/registry.py build
    ```
 
@@ -17,34 +19,46 @@
 
 ## Vendor a third-party skill
 
-```sh
-python3 scripts/registry.py add django/django-expert \
-  --repo https://github.com/vintasoftware/django-ai-plugins \
-  --path skills/django-expert --license MIT --tags django,python \
-  --copyright "2025 Vinta Software"
-```
+1. Vendor the upstream skill:
 
-This writes the `vendor.json` entry, pulls the folder, sets `license`, `source` and `tags` in the frontmatter, writes a `LICENSE` file if upstream has none (templates in `scripts/licenses/`), and rebuilds. Add `needs-network` to `--tags` if the skill fetches from the web at runtime. Then commit the folder, `vendor.json`, `index.json` and `README.md`.
+   ```bash
+   # pull the skill, set its frontmatter, write a LICENSE and rebuild
+   python3 scripts/registry.py add django/django-expert \
+     --repo https://github.com/vintasoftware/django-ai-plugins \
+     --path skills/django-expert --license MIT --tags django,python \
+     --copyright "2025 Vinta Software"
+   ```
 
-Later updates: `python3 scripts/registry.py sync <category>/<name>`.
+   This writes the `vendor.json` entry, pulls the folder, sets `name`, `license`, `source` and `tags` in the frontmatter, writes a `LICENSE` file if upstream has none (templates in `scripts/licenses/`), and rebuilds. `name` comes from the key, so the skill can be renamed on the way in. Add `needs-network` to `--tags` if the skill fetches from the web at runtime.
+
+2. Commit the folder, `vendor.json`, `index.json` and `README.md`.
+3. Later updates: `python3 scripts/registry.py sync <category>/<name>`.
+
+If `add` fails the closing build, it prints a cleanup hint; follow it, fix the cause, then run `add` again.
 
 ## Validate without writing
 
-```sh
+```bash
+# check every skill and the manifest
 python3 scripts/registry.py validate
+# fail if index.json or the README table are out of date
 python3 scripts/registry.py build --check
 ```
 
 ## Tests
 
-```sh
+```bash
+# run the test suite
 pytest
 ```
 
 ## Lint
 
-```sh
+```bash
+# install the dev deps
 pip install -r requirements-dev.txt
+# lint
 ruff check scripts tests
+# format
 ruff format scripts tests
 ```
