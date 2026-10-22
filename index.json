@@ -1,0 +1,54 @@
+{
+  "generated": "2026-10-22",
+  "skills": [
+    {
+      "name": "vercel-composition-patterns",
+      "description": "React composition patterns that scale. Use when refactoring components with boolean prop proliferation, building flexible component libraries, or designing reusable APIs. Triggers on tasks involving compound components, render props, context providers, or component architecture. Includes React 19 API changes.",
+      "path": "skills/vercel-composition-patterns",
+      "license": "MIT",
+      "source": "https://github.com/vercel-labs/agent-skills",
+      "tags": [
+        "react",
+        "architecture",
+        "components"
+      ],
+      "metadata": {
+        "author": "vercel",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "name": "vercel-react-best-practices",
+      "description": "React and Next.js performance optimization guidelines from Vercel Engineering. This skill should be used when writing, reviewing, or refactoring React/Next.js code to ensure optimal performance patterns. Triggers on tasks involving React components, Next.js pages, data fetching, bundle optimization, or performance improvements.",
+      "path": "skills/vercel-react-best-practices",
+      "license": "MIT",
+      "source": "https://github.com/vercel-labs/agent-skills",
+      "tags": [
+        "react",
+        "nextjs",
+        "performance"
+      ],
+      "metadata": {
+        "author": "vercel",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "name": "web-design-guidelines",
+      "description": "Review UI code for Web Interface Guidelines compliance. Use when asked to \"review my UI\", \"check accessibility\", \"audit design\", \"review UX\", or \"check my site against best practices\".",
+      "path": "skills/web-design-guidelines",
+      "license": "MIT",
+      "source": "https://github.com/vercel-labs/agent-skills",
+      "tags": [
+        "ui",
+        "accessibility",
+        "review"
+      ],
+      "metadata": {
+        "author": "vercel",
+        "version": "1.0.0",
+        "argument-hint": "<file-or-pattern>"
+      }
+    }
+  ]
+}
