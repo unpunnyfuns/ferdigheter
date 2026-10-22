@@ -199,29 +199,52 @@ def test_build_index_sorts_and_omits_optional():
         "skills": [
             {
                 "name": "alpha",
-                "description": "A",
                 "category": "misc",
+                "description": "A",
                 "path": "skills/misc/alpha",
                 "license": "MIT",
                 "source": "https://x",
                 "tags": ["t"],
                 "metadata": {"v": "1"},
             },
-            {"name": "zeta", "description": "Z", "category": "misc", "path": "skills/misc/zeta"},
+            {
+                "name": "zeta",
+                "category": "misc",
+                "description": "Z",
+                "path": "skills/misc/zeta",
+            },
         ],
     }
 
 
 def test_render_table():
     entries = [
-        {"name": "a", "description": "Has | pipe\nand newline", "path": "skills/a", "tags": ["x", "y"]},
-        {"name": "b", "description": "Plain", "path": "skills/b"},
+        {"name": "a", "category": "c", "description": "Has | pipe\nand newline", "path": "skills/c/a", "tags": ["x", "y"]},
+        {"name": "b", "category": "c", "description": "Plain", "path": "skills/c/b"},
     ]
     assert registry.render_table(entries) == (
         "| Skill | Description | Tags |\n"
         "|---|---|---|\n"
-        "| [a](skills/a/) | Has \\| pipe and newline | x, y |\n"
-        "| [b](skills/b/) | Plain |  |"
+        "| [a](skills/c/a/) | Has \\| pipe and newline | x, y |\n"
+        "| [b](skills/c/b/) | Plain |  |"
+    )
+
+
+def test_render_sections_groups_by_category():
+    entries = [
+        {"name": "a", "category": "web", "description": "A", "path": "skills/web/a"},
+        {"name": "b", "category": "process", "description": "B", "path": "skills/process/b"},
+        {"name": "c", "category": "web", "description": "C", "path": "skills/web/c"},
+    ]
+    assert registry.render_sections(entries) == (
+        "### process\n\n"
+        "| Skill | Description | Tags |\n|---|---|---|\n"
+        "| [b](skills/process/b/) | B |  |\n"
+        "\n"
+        "### web\n\n"
+        "| Skill | Description | Tags |\n|---|---|---|\n"
+        "| [a](skills/web/a/) | A |  |\n"
+        "| [c](skills/web/c/) | C |  |"
     )
 
 
@@ -270,7 +293,9 @@ def test_cli_build_writes_outputs(tmp_path, capsys):
     assert index["skills"][0]["name"] == "foo"
     assert (tmp_path / "index.json").read_text(encoding="utf-8").endswith("}\n")
     readme = (tmp_path / "README.md").read_text(encoding="utf-8")
-    assert "| [foo](skills/foo/) | Does foo. | x |" in readme
+    assert "### misc\n\n| Skill |" in readme
+    assert "| [foo](skills/misc/foo/) | Does foo. | x |" in readme
+    assert index["skills"][0]["category"] == "misc"
 
 
 def test_cli_build_refuses_on_problems(tmp_path):

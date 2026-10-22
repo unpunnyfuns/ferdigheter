@@ -173,8 +173,8 @@ def index_entry(skill: Skill) -> dict:
     data = skill.data
     entry = {
         "name": data["name"],
-        "description": data["description"].strip(),
         "category": skill.category,
+        "description": data["description"].strip(),
         "path": f"skills/{skill.category}/{skill.dirname}",
     }
     for key in OPTIONAL_FIELDS:
@@ -195,10 +195,20 @@ def _cell(text: str) -> str:
 def render_table(entries: list[dict]) -> str:
     lines = ["| Skill | Description | Tags |", "|---|---|---|"]
     for entry in entries:
-        name = entry["name"]
         tags = ", ".join(entry.get("tags", []))
-        lines.append(f"| [{name}](skills/{name}/) | {_cell(entry['description'])} | {tags} |")
+        lines.append(
+            f"| [{entry['name']}]({entry['path']}/) | {_cell(entry['description'])} | {tags} |"
+        )
     return "\n".join(lines)
+
+
+def render_sections(entries: list[dict]) -> str:
+    categories = sorted({e["category"] for e in entries})
+    sections = [
+        f"### {category}\n\n" + render_table([e for e in entries if e["category"] == category])
+        for category in categories
+    ]
+    return "\n\n".join(sections)
 
 
 def splice_readme(text: str, table: str) -> str:
@@ -217,7 +227,7 @@ def render_outputs(root: Path, today: date) -> tuple[dict[Path, str], list[str]]
     index = build_index(skills, today)
     readme_path = root / "README.md"
     try:
-        readme = splice_readme(readme_path.read_text(encoding="utf-8"), render_table(index["skills"]))
+        readme = splice_readme(readme_path.read_text(encoding="utf-8"), render_sections(index["skills"]))
     except (OSError, ValueError) as exc:
         return {}, [f"README.md: {exc}"]
     index_text = json.dumps(index, indent=2, ensure_ascii=False) + "\n"
