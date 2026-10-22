@@ -360,3 +360,71 @@ def test_cli_build_check_keeps_existing_date(tmp_path):
     index["generated"] = "2000-01-01"
     index_path.write_text(json.dumps(index, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     assert registry.main(["--root", str(tmp_path), "build", "--check"]) == 0
+
+
+def write_manifest_file(root: Path, manifest) -> None:
+    (root / "vendor.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+
+def test_load_manifest_missing_is_empty(tmp_path):
+    assert registry.load_manifest(tmp_path) == ({}, [])
+
+
+def test_load_manifest_invalid_json(tmp_path):
+    (tmp_path / "vendor.json").write_text("{", encoding="utf-8")
+    manifest, problems = registry.load_manifest(tmp_path)
+    assert manifest == {}
+    assert problems[0].startswith("vendor.json: invalid json:")
+
+
+def test_load_manifest_not_object(tmp_path):
+    write_manifest_file(tmp_path, [])
+    assert registry.load_manifest(tmp_path) == ({}, ["vendor.json: must be a JSON object"])
+
+
+def test_write_manifest_sorts_keys(tmp_path):
+    registry.write_manifest(tmp_path, {"b/x": {"repo": "r", "path": "p", "ref": "main"}, "a/y": {"repo": "r", "path": "p", "ref": "main"}})
+    text = (tmp_path / "vendor.json").read_text(encoding="utf-8")
+    assert text.startswith('{\n  "a/y": {')
+    assert text.endswith("}\n")
+
+
+def test_validate_manifest_ok(tmp_path):
+    make_skill(tmp_path, "foo", "name: foo\ndescription: x\nsource: https://x\n")
+    skills, _ = registry.load_all(tmp_path)
+    manifest = {"misc/foo": {"repo": "https://x", "path": "skills/foo", "ref": "main"}}
+    assert registry.validate_manifest(tmp_path, manifest, skills) == []
+
+
+@pytest.mark.parametrize(
+    "manifest, message",
+    [
+        ({"Bad Key": {"repo": "r", "path": "p", "ref": "main"}}, "vendor.json: key 'Bad Key' is not <category>/<name>"),
+        ({"misc/nope": {"repo": "r", "path": "p", "ref": "main"}}, "vendor.json: 'misc/nope' has no skill folder"),
+        ({"misc/foo": {"repo": "r", "path": "p"}}, "vendor.json: 'misc/foo' needs repo, path and ref"),
+        ({"misc/foo": {"repo": "", "path": "p", "ref": "main"}}, "vendor.json: 'misc/foo' needs repo, path and ref"),
+        ({"misc/foo": "nope"}, "vendor.json: 'misc/foo' needs repo, path and ref"),
+    ],
+)
+def test_validate_manifest_problems(tmp_path, manifest, message):
+    make_skill(tmp_path, "foo")
+    skills, _ = registry.load_all(tmp_path)
+    assert message in registry.validate_manifest(tmp_path, manifest, skills)
+
+
+def test_validate_manifest_source_without_entry(tmp_path):
+    make_skill(tmp_path, "foo", "name: foo\ndescription: x\nsource: https://x\n")
+    skills, _ = registry.load_all(tmp_path)
+    assert registry.validate_manifest(tmp_path, {}, skills) == [
+        "skills/misc/foo/SKILL.md: has source but no vendor.json entry"
+    ]
+
+
+def test_load_all_includes_manifest_problems(tmp_path):
+    make_skill(tmp_path, "foo", "name: foo\ndescription: x\nsource: https://x\n")
+    write_manifest_file(tmp_path, {"misc/gone": {"repo": "r", "path": "p", "ref": "main"}})
+    _, problems = registry.load_all(tmp_path)
+    assert problems == [
+        "vendor.json: 'misc/gone' has no skill folder",
+        "skills/misc/foo/SKILL.md: has source but no vendor.json entry",
+    ]
