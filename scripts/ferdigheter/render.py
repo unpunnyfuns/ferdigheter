@@ -88,6 +88,6 @@ def _existing_generated(root: Path) -> date:
     if path.is_file():
         try:
             return date.fromisoformat(json.loads(path.read_text(encoding="utf-8"))["generated"])
-        except (ValueError, KeyError, TypeError):
+        except ValueError, KeyError, TypeError:
             pass
     return date.today()
