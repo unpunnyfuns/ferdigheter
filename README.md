@@ -96,4 +96,14 @@ python3 scripts/registry.py sync
 python3 scripts/registry.py sync web/vercel-react-best-practices
 ```
 
-`sync` replaces the skill folder with upstream, keeps the registry's `license`, `source` and `tags` frontmatter and any `LICENSE` file upstream lacks, records the commit in `vendor.json`, and rebuilds the index. It refuses to touch a folder with uncommitted changes.
+`sync` replaces the skill folder with upstream, records the commit in `vendor.json`, and rebuilds the index. It refuses to touch a folder with uncommitted changes.
+
+The registry owns four frontmatter fields: `name`, `license`, `source` and `tags`. Sync keeps those values, plus a `LICENSE` file the registry added for an upstream that ships none. Everything else, `description`, `metadata` and any other key, comes from upstream and is overwritten on every sync.
+
+`sync --check` only compares commits; it exits 1 when any entry has a newer upstream commit and 0 when all are current.
+
+If a sync aborts partway, restore the affected skill with:
+
+```sh
+git checkout -- skills/<category>/<name> vendor.json
+```

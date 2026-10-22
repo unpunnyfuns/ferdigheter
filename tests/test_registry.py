@@ -611,3 +611,159 @@ def test_cli_sync_reports_git_failure(tmp_path, capsys):
     assert registry.main(["--root", str(root), "sync"]) == 1
     out = capsys.readouterr().out
     assert out.startswith("misc/foo: git clone failed: ")
+
+
+def test_merge_frontmatter_keeps_registry_name_in_place():
+    merged = registry.merge_frontmatter(
+        UPSTREAM_V1, {"name": "vercel-foo", "license": "MIT", "source": "https://x", "tags": ["a"]}
+    )
+    data, body = registry.parse_frontmatter(merged)
+    assert list(data) == ["name", "description", "license", "source", "tags"]
+    assert data["name"] == "vercel-foo"
+    assert body == "\n# Foo v1\n"
+
+
+def test_replace_skill_keeps_registry_name(tmp_path):
+    skill_dir = make_skill(
+        tmp_path,
+        "vercel-foo",
+        "name: vercel-foo\ndescription: Old.\nlicense: MIT\nsource: https://x\ntags: [a]\n",
+    )
+    upstream = tmp_path / "up"
+    upstream.mkdir()
+    (upstream / "SKILL.md").write_text(UPSTREAM_V1, encoding="utf-8")
+    registry.replace_skill(skill_dir, upstream)
+    data, _ = registry.parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
+    assert list(data) == ["name", "description", "license", "source", "tags"]
+    assert data["name"] == "vercel-foo"
+    assert data["description"] == "Upstream v1."
+
+
+@pytest.mark.parametrize(
+    "key, entry, message",
+    [
+        ("misc/foo", {"repo": "r", "path": "p"}, "vendor.json: 'misc/foo' needs repo, path and ref"),
+        ("misc/foo", "nope", "vendor.json: 'misc/foo' needs repo, path and ref"),
+        (
+            "misc/foo",
+            {"repo": "r", "path": "../x", "ref": "main"},
+            "vendor.json: 'misc/foo' path must be a relative path inside the repo",
+        ),
+        (
+            "misc/foo",
+            {"repo": "r", "path": "/etc", "ref": "main"},
+            "vendor.json: 'misc/foo' path must be a relative path inside the repo",
+        ),
+        (
+            "../docs",
+            {"repo": "r", "path": "p", "ref": "main"},
+            "vendor.json: key '../docs' is not <category>/<name>",
+        ),
+    ],
+)
+def test_sync_entry_problems(key, entry, message):
+    assert registry._sync_entry_problems(key, entry) == [message]
+
+
+def test_sync_entry_problems_accepts_nested_path():
+    assert registry._sync_entry_problems("misc/foo", {"repo": "r", "path": "a/b", "ref": "main"}) == []
+
+
+@pytest.mark.parametrize("check", [False, True])
+@pytest.mark.parametrize(
+    "manifest, message",
+    [
+        ({"misc/foo": {"repo": "r", "path": "p"}}, "vendor.json: 'misc/foo' needs repo, path and ref"),
+        ({"misc/foo": "nope"}, "vendor.json: 'misc/foo' needs repo, path and ref"),
+        (
+            {"misc/foo": {"repo": "r", "path": "../x", "ref": "main"}},
+            "vendor.json: 'misc/foo' path must be a relative path inside the repo",
+        ),
+        (
+            {"misc/foo": {"repo": "r", "path": "/etc", "ref": "main"}},
+            "vendor.json: 'misc/foo' path must be a relative path inside the repo",
+        ),
+        (
+            {"../docs": {"repo": "r", "path": "p", "ref": "main"}},
+            "vendor.json: key '../docs' is not <category>/<name>",
+        ),
+    ],
+)
+def test_cli_sync_rejects_bad_entry(tmp_path, capsys, manifest, message, check):
+    root, _, _ = make_vendored_repo(tmp_path)
+    before = (root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8")
+    write_manifest_file(root, manifest)
+    argv = ["--root", str(root), "sync"] + (["--check"] if check else [])
+    assert registry.main(argv) == 1
+    assert capsys.readouterr().out == f"{message}\n"
+    assert (root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8") == before
+
+
+@pytest.mark.parametrize(
+    "check, failure",
+    [(False, "misc/foo: git clone failed: "), (True, "misc/foo: git ls-remote failed: ")],
+)
+def test_cli_sync_repo_cannot_smuggle_git_option(tmp_path, capsys, check, failure):
+    root, _, _ = make_vendored_repo(tmp_path)
+    write_manifest_file(
+        root,
+        {"misc/foo": {"repo": "--upload-pack=/nonexistent", "path": "skills/foo", "ref": "main"}},
+    )
+    commit_all(root, "option-like repo")
+    argv = ["--root", str(root), "sync"] + (["--check"] if check else [])
+    assert registry.main(argv) == 1
+    assert capsys.readouterr().out.startswith(failure)
+
+
+def test_cli_sync_annotated_tag(tmp_path, capsys):
+    root, url, sha = make_vendored_repo(tmp_path)
+    git(tmp_path / "upstream", "tag", "-a", "v1", "-m", "v1")
+    write_manifest_file(root, {"misc/foo": {"repo": url, "path": "skills/foo", "ref": "v1"}})
+    commit_all(root, "pin v1")
+    assert registry.main(["--root", str(root), "sync"]) == 0
+    assert capsys.readouterr().out == f"misc/foo: none -> {sha[:7]}\n"
+    commit_all(root, "synced")
+    assert registry.main(["--root", str(root), "sync", "--check"]) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_remote_commit_prefers_branch_over_same_name_tag(tmp_path):
+    url, old_sha = make_upstream(tmp_path)
+    upstream = tmp_path / "upstream"
+    git(upstream, "tag", "dup")
+    (upstream / "skills" / "foo" / "SKILL.md").write_text(
+        UPSTREAM_V1.replace("v1", "v2"), encoding="utf-8"
+    )
+    new_sha = commit_all(upstream, "v2")
+    git(upstream, "branch", "dup")
+    assert registry.remote_commit(url, "dup") == new_sha
+    assert new_sha != old_sha
+
+
+def test_sync_skill_bad_upstream_frontmatter_keeps_old_folder(tmp_path):
+    url, _ = make_upstream(tmp_path, "---\nname: foo\ndescription: Broken.\n")
+    root = tmp_path / "reg"
+    skill_dir = make_skill(root, "foo", "name: foo\ndescription: Old.\nlicense: MIT\n")
+    (skill_dir / "extra.md").write_text("keep\n", encoding="utf-8")
+    entry = {"repo": url, "path": "skills/foo", "ref": "main"}
+    with pytest.raises(registry.FrontmatterError, match="unterminated"):
+        registry.sync_skill(root, "misc/foo", entry)
+    assert (skill_dir / "extra.md").read_text(encoding="utf-8") == "keep\n"
+    data, _ = registry.parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
+    assert data["description"] == "Old."
+
+
+def test_cli_sync_without_manifest_writes_nothing(tmp_path, capsys):
+    make_repo(tmp_path)
+    assert registry.main(["--root", str(tmp_path), "sync"]) == 0
+    assert capsys.readouterr().out == ""
+    assert not (tmp_path / "vendor.json").exists()
+
+
+def test_cli_sync_refuses_untracked_file_in_subdir(tmp_path, capsys):
+    root, _, _ = make_vendored_repo(tmp_path)
+    rules = root / "skills" / "misc" / "foo" / "rules"
+    rules.mkdir()
+    (rules / "extra.md").write_text("new\n", encoding="utf-8")
+    assert registry.main(["--root", str(root), "sync"]) == 1
+    assert capsys.readouterr().out == "skills/misc/foo: has uncommitted changes\n"

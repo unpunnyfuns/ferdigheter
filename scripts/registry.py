@@ -12,7 +12,7 @@ import sys
 import tempfile
 import yaml
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import NamedTuple
 
 
@@ -233,6 +233,8 @@ def registry_fields(data: dict) -> dict:
 
 def merge_frontmatter(upstream_text: str, overrides: dict) -> str:
     data, body = parse_frontmatter(upstream_text)
+    if "name" in overrides:
+        data["name"] = overrides["name"]
     upstream_only = {key: value for key, value in data.items() if key not in REGISTRY_FIELDS}
     return dump_frontmatter({**upstream_only, **registry_fields(overrides)}, body)
 
@@ -243,31 +245,53 @@ def _git(*args: str, cwd: Path | None = None) -> str:
 
 
 def fetch_upstream(repo: str, ref: str, dest: Path) -> str:
-    _git("clone", "--quiet", "--depth", "1", "--branch", ref, repo, str(dest))
+    _git("clone", "--quiet", "--depth", "1", "--branch", ref, "--", repo, str(dest))
     return _git("rev-parse", "HEAD", cwd=dest)
 
 
 def remote_commit(repo: str, ref: str) -> str:
-    output = _git("ls-remote", repo, f"refs/heads/{ref}", f"refs/tags/{ref}")
+    output = _git(
+        "ls-remote",
+        "--",
+        repo,
+        f"refs/heads/{ref}",
+        f"refs/tags/{ref}",
+        f"refs/tags/{ref}^{{}}",
+    )
     if not output:
         raise subprocess.CalledProcessError(1, ["git", "ls-remote"], stderr=f"ref {ref!r} not found in {repo}")
-    return output.split()[0]
+    refs = [line.split(maxsplit=1) for line in output.splitlines() if line.strip()]
+    peeled = [sha for sha, name in refs if name.endswith("^{}")]
+    if peeled:
+        return peeled[0]
+    branches = [sha for sha, name in refs if name.startswith("refs/heads/")]
+    if branches:
+        return branches[0]
+    return refs[0][0]
+
+
+def kept_fields(data: dict) -> dict:
+    kept = registry_fields(data)
+    if "name" in data:
+        kept["name"] = data["name"]
+    return kept
 
 
 def replace_skill(skill_dir: Path, upstream_dir: Path) -> None:
     old_skill_md = skill_dir / "SKILL.md"
     overrides = {}
     if old_skill_md.is_file():
-        overrides = registry_fields(parse_frontmatter(old_skill_md.read_text(encoding="utf-8"))[0])
+        overrides = kept_fields(parse_frontmatter(old_skill_md.read_text(encoding="utf-8"))[0])
+    merged = merge_frontmatter(
+        (upstream_dir / "SKILL.md").read_text(encoding="utf-8"), overrides
+    )
     old_license = skill_dir / "LICENSE"
     kept_license = None
     if old_license.is_file() and not (upstream_dir / "LICENSE").exists():
         kept_license = old_license.read_bytes()
     shutil.rmtree(skill_dir, ignore_errors=True)
     shutil.copytree(upstream_dir, skill_dir)
-    new_skill_md = skill_dir / "SKILL.md"
-    merged = merge_frontmatter(new_skill_md.read_text(encoding="utf-8"), overrides)
-    new_skill_md.write_text(merged, encoding="utf-8")
+    (skill_dir / "SKILL.md").write_text(merged, encoding="utf-8")
     if kept_license is not None:
         (skill_dir / "LICENSE").write_bytes(kept_license)
 
@@ -397,7 +421,22 @@ def _first_line(text: str | None) -> str:
 
 
 def dirty_keys(root: Path, keys: list[str]) -> list[str]:
-    return [key for key in keys if _git("status", "--porcelain", "--", f"skills/{key}", cwd=root)]
+    return [
+        key
+        for key in keys
+        if _git("status", "--porcelain", "-uall", "--", f"skills/{key}", cwd=root)
+    ]
+
+
+def _sync_entry_problems(key: str, entry: object) -> list[str]:
+    if not KEY_RE.match(key):
+        return [f"{VENDOR_FILE}: key {key!r} is not <category>/<name>"]
+    if not _entry_complete(entry):
+        return [f"{VENDOR_FILE}: {key!r} needs repo, path and ref"]
+    path = PurePosixPath(entry["path"])
+    if path.is_absolute() or ".." in path.parts:
+        return [f"{VENDOR_FILE}: {key!r} path must be a relative path inside the repo"]
+    return []
 
 
 def _sync_check(manifest: dict, keys: list[str]) -> int:
@@ -421,6 +460,9 @@ def run_sync(root: Path, keys: list[str], check: bool) -> int:
     unknown = [key for key in selected if key not in manifest]
     if unknown:
         return _report([f"{VENDOR_FILE}: unknown key {key!r}" for key in unknown])
+    bad = [p for key in selected for p in _sync_entry_problems(key, manifest[key])]
+    if bad:
+        return _report(bad)
     if check:
         return _sync_check(manifest, selected)
     try:
@@ -430,6 +472,7 @@ def run_sync(root: Path, keys: list[str], check: bool) -> int:
     if dirty:
         return _report([f"skills/{key}: has uncommitted changes" for key in dirty])
     failures: list[str] = []
+    synced = False
     for key in selected:
         entry = manifest[key]
         try:
@@ -442,7 +485,9 @@ def run_sync(root: Path, keys: list[str], check: bool) -> int:
             break
         print(f"{key}: {_short(entry.get('commit'))} -> {_short(commit)}")
         entry["commit"] = commit
-    write_manifest(root, manifest)
+        synced = True
+    if synced:
+        write_manifest(root, manifest)
     if failures:
         return _report(failures)
     return run_build(root, check=False)
