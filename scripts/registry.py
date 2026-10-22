@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate skills under skills/ and build index.json plus the README table."""
+"""Validate skills under skills/ and build index.json plus the CATALOG.md table."""
 
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ REGISTRY_FIELDS = ("license", "source", "tags")
 START_MARKER = "<!-- index:start -->"
 END_MARKER = "<!-- index:end -->"
 VENDOR_FILE = "vendor.json"
+CATALOG_FILE = "CATALOG.md"
 KEY_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$")
 SPDX_RE = re.compile(r"^[A-Za-z0-9.+-]+$")
 LICENSE_DIR = Path(__file__).resolve().parent / "licenses"
@@ -385,7 +386,7 @@ def render_sections(entries: list[dict]) -> str:
     return "\n\n".join(sections)
 
 
-def splice_readme(text: str, table: str) -> str:
+def splice_catalog(text: str, table: str) -> str:
     start = text.find(START_MARKER)
     end = text.find(END_MARKER)
     if start == -1 or end == -1 or end < start:
@@ -399,15 +400,15 @@ def render_outputs(root: Path, today: date) -> tuple[dict[Path, str], list[str]]
     if problems:
         return {}, problems
     index = build_index(skills, today)
-    readme_path = root / "README.md"
+    catalog_path = root / CATALOG_FILE
     try:
-        readme = splice_readme(
-            readme_path.read_text(encoding="utf-8"), render_sections(index["skills"])
+        catalog = splice_catalog(
+            catalog_path.read_text(encoding="utf-8"), render_sections(index["skills"])
         )
     except (OSError, ValueError) as exc:
-        return {}, [f"README.md: {exc}"]
+        return {}, [f"{CATALOG_FILE}: {exc}"]
     index_text = json.dumps(index, indent=2, ensure_ascii=False) + "\n"
-    return {root / "index.json": index_text, readme_path: readme}, []
+    return {root / "index.json": index_text, catalog_path: catalog}, []
 
 
 def _existing_generated(root: Path) -> date:
@@ -613,7 +614,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("validate", help="check every skill, print problems")
-    build = sub.add_parser("build", help="validate, then write index.json and README table")
+    build = sub.add_parser("build", help="validate, then write index.json and CATALOG.md table")
     build.add_argument("--check", action="store_true", help="fail if outputs are out of date")
     sync = sub.add_parser("sync", help="pull vendored skills from upstream per vendor.json")
     sync.add_argument("keys", nargs="*", help="<category>/<name> entries to sync; default all")

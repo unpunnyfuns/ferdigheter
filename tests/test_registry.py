@@ -284,22 +284,22 @@ def test_render_sections_empty():
     assert registry.render_sections([]) == ""
 
 
-def test_splice_readme_replaces_between_markers():
+def test_splice_catalog_replaces_between_markers():
     text = "# T\n\nintro\n\n<!-- index:start -->\nold\n<!-- index:end -->\n\nfooter\n"
-    out = registry.splice_readme(text, "TABLE")
+    out = registry.splice_catalog(text, "TABLE")
     assert out == "# T\n\nintro\n\n<!-- index:start -->\nTABLE\n<!-- index:end -->\n\nfooter\n"
 
 
-def test_splice_readme_missing_markers():
+def test_splice_catalog_missing_markers():
     with pytest.raises(ValueError, match="markers"):
-        registry.splice_readme("# T\n", "TABLE")
+        registry.splice_catalog("# T\n", "TABLE")
 
 
-README = "# Reg\n\n<!-- index:start -->\n<!-- index:end -->\n"
+CATALOG = "# Catalog\n\n<!-- index:start -->\n<!-- index:end -->\n"
 
 
 def make_repo(tmp_path: Path) -> Path:
-    (tmp_path / "README.md").write_text(README, encoding="utf-8")
+    (tmp_path / "CATALOG.md").write_text(CATALOG, encoding="utf-8")
     make_skill(tmp_path, "foo", "name: foo\ndescription: Does foo.\ntags: [x]\n")
     return tmp_path
 
@@ -328,9 +328,9 @@ def test_cli_build_writes_outputs(tmp_path, capsys):
     assert index["generated"] == date.today().isoformat()
     assert index["skills"][0]["name"] == "foo"
     assert (tmp_path / "index.json").read_text(encoding="utf-8").endswith("}\n")
-    readme = (tmp_path / "README.md").read_text(encoding="utf-8")
-    assert "### misc\n\n| Skill |" in readme
-    assert "| [foo](skills/misc/foo/) | Does foo. | x |" in readme
+    catalog = (tmp_path / "CATALOG.md").read_text(encoding="utf-8")
+    assert "### misc\n\n| Skill |" in catalog
+    assert "| [foo](skills/misc/foo/) | Does foo. | x |" in catalog
     assert index["skills"][0]["category"] == "misc"
 
 
@@ -343,15 +343,15 @@ def test_cli_build_refuses_on_problems(tmp_path):
 
 def test_cli_build_missing_markers(tmp_path, capsys):
     make_repo(tmp_path)
-    (tmp_path / "README.md").write_text("# no markers\n", encoding="utf-8")
+    (tmp_path / "CATALOG.md").write_text("# no markers\n", encoding="utf-8")
     assert registry.main(["--root", str(tmp_path), "build"]) == 1
-    assert capsys.readouterr().out == "README.md: missing index markers\n"
+    assert capsys.readouterr().out == "CATALOG.md: missing index markers\n"
 
 
 def test_cli_build_check(tmp_path, capsys):
     make_repo(tmp_path)
     assert registry.main(["--root", str(tmp_path), "build", "--check"]) == 1
-    assert capsys.readouterr().out == "index.json is out of date\nREADME.md is out of date\n"
+    assert capsys.readouterr().out == "index.json is out of date\nCATALOG.md is out of date\n"
     assert not (tmp_path / "index.json").exists()
 
     registry.main(["--root", str(tmp_path), "build"])
@@ -603,7 +603,7 @@ def make_vendored_repo(tmp_path: Path) -> tuple[Path, str, str]:
     url, sha = make_upstream(tmp_path)
     root = tmp_path / "reg"
     init_repo(root)
-    (root / "README.md").write_text(README, encoding="utf-8")
+    (root / "CATALOG.md").write_text(CATALOG, encoding="utf-8")
     make_skill(
         root, "foo", "name: foo\ndescription: Old.\nlicense: MIT\nsource: https://x\ntags: [a]\n"
     )
@@ -901,7 +901,7 @@ def test_set_registry_fields(tmp_path):
 def make_bare_registry(tmp_path: Path) -> Path:
     root = tmp_path / "reg"
     init_repo(root)
-    (root / "README.md").write_text(README, encoding="utf-8")
+    (root / "CATALOG.md").write_text(CATALOG, encoding="utf-8")
     commit_all(root, "init")
     return root
 
@@ -945,7 +945,7 @@ def test_cli_add_vendors_skill(tmp_path, capsys):
     )
     manifest = json.loads((root / "vendor.json").read_text(encoding="utf-8"))
     assert manifest["misc/foo"] == {"repo": url, "path": "skills/foo", "ref": "main", "commit": sha}
-    assert "| [foo](skills/misc/foo/) | Upstream v1. | a, b |" in (root / "README.md").read_text(
+    assert "| [foo](skills/misc/foo/) | Upstream v1. | a, b |" in (root / "CATALOG.md").read_text(
         encoding="utf-8"
     )
     assert registry.main(["--root", str(root), "validate"]) == 0
@@ -1105,7 +1105,7 @@ def test_cli_add_sets_name_from_key(tmp_path, capsys):
     assert data["name"] == "vercel-foo"
     capsys.readouterr()
     assert registry.main(["--root", str(root), "validate"]) == 0
-    assert "| [vercel-foo](skills/misc/vercel-foo/) |" in (root / "README.md").read_text(
+    assert "| [vercel-foo](skills/misc/vercel-foo/) |" in (root / "CATALOG.md").read_text(
         encoding="utf-8"
     )
 

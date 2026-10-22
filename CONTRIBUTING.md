@@ -11,11 +11,11 @@
    ```bash
    # install the runtime deps
    pip install -r requirements.txt
-   # regenerate index.json and the README table
+   # regenerate index.json and CATALOG.md
    python3 scripts/registry.py build
    ```
 
-6. Commit the skill folder together with the regenerated `index.json` and `README.md`.
+6. Commit the skill folder together with the regenerated `index.json` and `CATALOG.md`.
 
 ## Vendor a third-party skill
 
@@ -31,7 +31,7 @@
 
    This writes the `vendor.json` entry, pulls the folder, sets `name`, `license`, `source` and `tags` in the frontmatter, writes a `LICENSE` file if upstream has none (templates in `scripts/licenses/`), and rebuilds. `name` comes from the key, so the skill can be renamed on the way in. Add `needs-network` to `--tags` if the skill fetches from the web at runtime.
 
-2. Commit the folder, `vendor.json`, `index.json` and `README.md`.
+2. Commit the folder, `vendor.json`, `index.json` and `CATALOG.md`.
 3. Later updates: `python3 scripts/registry.py sync <category>/<name>`.
 
 If `add` fails the closing build, it prints a cleanup hint; follow it, fix the cause, then run `add` again.
@@ -41,7 +41,7 @@ If `add` fails the closing build, it prints a cleanup hint; follow it, fix the c
 ```bash
 # check every skill and the manifest
 python3 scripts/registry.py validate
-# fail if index.json or the README table are out of date
+# fail if index.json or CATALOG.md are out of date
 python3 scripts/registry.py build --check
 ```
 

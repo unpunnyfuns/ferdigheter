@@ -8,9 +8,10 @@ Registry of agent skills in the [Agent Skills](https://agentskills.io) format. A
 |---|---|
 | `skills/<category>/<name>/` | One skill per folder, `SKILL.md` plus supporting files. Category is the parent folder |
 | `skills/_template/` | Starting point for a new skill |
+| `CATALOG.md` | Generated list of every skill by category |
 | `index.json` | Generated machine-readable index |
 | `vendor.json` | Upstream repo, path, ref and last-synced commit for every vendored skill |
-| `scripts/registry.py` | Validates skills, generates `index.json` and the table below, vendors and updates third-party skills |
+| `scripts/registry.py` | Validates skills, generates `index.json` and `CATALOG.md`, vendors and updates third-party skills |
 | `scripts/licenses/` | License templates used by `add` |
 
 ## Using a skill
@@ -72,31 +73,7 @@ Each entry has `name`, `category`, `description`, `path`, and optionally `licens
 
 ## Skills
 
-<!-- index:start -->
-### django
-
-| Skill | Description | Tags |
-|---|---|---|
-| [cdrf-expert](skills/django/cdrf-expert/) | Expert guidance for Django REST Framework class-based views using Classy DRF (https://www.cdrf.co). Use when selecting or debugging APIView, GenericAPIView, concrete generic views, mixin combinations, or ViewSet/GenericViewSet/ModelViewSet behavior; tracing method resolution order (MRO); understanding which method to override (`create` vs `perform_create`, `update` vs `perform_update`, `destroy` vs `perform_destroy`, `get_queryset`, `get_serializer_class`); and comparing behavior across DRF versions. Do not use for function-based views, GraphQL, FastAPI/Flask, frontend work, or non-DRF backend frameworks. | django, drf, python, needs-network |
-| [django-celery-expert](skills/django/django-celery-expert/) | Expert Django Celery guidance for asynchronous task processing. Use when designing background tasks, configuring Celery workers, handling task retries and errors, optimizing Celery performance, implementing periodic tasks with Celery Beat, or setting up production monitoring for Celery. Do not use for general Django questions unrelated to Celery, non-Celery task systems (Django Q, Huey, RQ), ML/data pipeline orchestration (Airflow, Prefect), or frontend and API-only concerns. Follows Vinta's Django Celery best practices. | django, celery, python |
-| [django-expert](skills/django/django-expert/) | Expert Django backend development guidance. Use when creating Django models, views, serializers, or APIs; debugging ORM queries or migrations; optimizing database performance; implementing authentication; writing tests; or working with Django REST Framework. Follows Django best practices and modern patterns. | django, python |
-| [django-reviewer](skills/django/django-reviewer/) | Review Django and Python changes for clarity, consistency, maintainability, ORM or DRF anti-patterns, and project conventions while preserving behavior. Use after Django code changes or when the user explicitly requests review. Report findings by default; apply refinements only when the user expresses explicit edit intent or the host has already authorized edits. | django, python, review |
-| [django-safe-migration](skills/django/django-safe-migration/) | Write, review, and rewrite Django migrations for PostgreSQL with zero-downtime guarantees. Use this skill whenever the user mentions migrations, Django schema changes, or deployment safety — even if they don't say "zero downtime" explicitly. Trigger on: "review this migration", "is this migration safe?", "write a migration for...", "rewrite this migration", "how do I add a NOT NULL column / drop a column / add an index / rename a column / add a FK without downtime", "will this migration cause locks?", "this migration is blocking production". Covers: SeparateDatabaseAndState two-file splits, AddIndexConcurrently, FK NOT VALID + VALIDATE, db_default for NOT NULL columns, lock_timeout, and RunPython safety rules. | django, postgres, migrations, python |
-
-### mcp
-
-| Skill | Description | Tags |
-|---|---|---|
-| [mcp-builder](skills/mcp/mcp-builder/) | Guide for creating high-quality MCP (Model Context Protocol) servers that enable LLMs to interact with external services through well-designed tools. Use when building MCP servers to integrate external APIs or services, whether in Python (FastMCP) or Node/TypeScript (MCP SDK). | mcp, python, typescript, needs-network |
-
-### web
-
-| Skill | Description | Tags |
-|---|---|---|
-| [vercel-composition-patterns](skills/web/vercel-composition-patterns/) | React composition patterns that scale. Use when refactoring components with boolean prop proliferation, building flexible component libraries, or designing reusable APIs. Triggers on tasks involving compound components, render props, context providers, or component architecture. Includes React 19 API changes. | react, architecture, components |
-| [vercel-react-best-practices](skills/web/vercel-react-best-practices/) | React and Next.js performance optimization guidelines from Vercel Engineering. This skill should be used when writing, reviewing, or refactoring React/Next.js code to ensure optimal performance patterns. Triggers on tasks involving React components, Next.js pages, data fetching, bundle optimization, or performance improvements. | react, nextjs, performance |
-| [web-design-guidelines](skills/web/web-design-guidelines/) | Review UI code for Web Interface Guidelines compliance. Use when asked to "review my UI", "check accessibility", "audit design", "review UX", or "check my site against best practices". | ui, accessibility, review, needs-network |
-<!-- index:end -->
+See [CATALOG.md](CATALOG.md) for the full list by category, or [index.json](index.json) for tooling.
 
 ## Adding a skill
 
@@ -107,11 +84,11 @@ Each entry has `name`, `category`, `description`, `path`, and optionally `licens
    ```bash
    # install the runtime deps
    pip install -r requirements.txt
-   # regenerate index.json and the README table
+   # regenerate index.json and CATALOG.md
    python3 scripts/registry.py build
    ```
 
-4. Commit the folder plus the regenerated `index.json` and `README.md`.
+4. Commit the folder plus the regenerated `index.json` and `CATALOG.md`.
 
 Details in [CONTRIBUTING.md](CONTRIBUTING.md).
 
