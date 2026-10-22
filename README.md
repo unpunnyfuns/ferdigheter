@@ -61,13 +61,19 @@ Each entry has `name`, `category`, `description`, `path`, and optionally `licens
 ## Skills
 
 <!-- index:start -->
+### mcp
+
+| Skill | Description | Tags |
+|---|---|---|
+| [mcp-builder](skills/mcp/mcp-builder/) | Guide for creating high-quality MCP (Model Context Protocol) servers that enable LLMs to interact with external services through well-designed tools. Use when building MCP servers to integrate external APIs or services, whether in Python (FastMCP) or Node/TypeScript (MCP SDK). | mcp, python, typescript, needs-network |
+
 ### web
 
 | Skill | Description | Tags |
 |---|---|---|
 | [vercel-composition-patterns](skills/web/vercel-composition-patterns/) | React composition patterns that scale. Use when refactoring components with boolean prop proliferation, building flexible component libraries, or designing reusable APIs. Triggers on tasks involving compound components, render props, context providers, or component architecture. Includes React 19 API changes. | react, architecture, components |
 | [vercel-react-best-practices](skills/web/vercel-react-best-practices/) | React and Next.js performance optimization guidelines from Vercel Engineering. This skill should be used when writing, reviewing, or refactoring React/Next.js code to ensure optimal performance patterns. Triggers on tasks involving React components, Next.js pages, data fetching, bundle optimization, or performance improvements. | react, nextjs, performance |
-| [web-design-guidelines](skills/web/web-design-guidelines/) | Review UI code for Web Interface Guidelines compliance. Use when asked to "review my UI", "check accessibility", "audit design", "review UX", or "check my site against best practices". | ui, accessibility, review |
+| [web-design-guidelines](skills/web/web-design-guidelines/) | Review UI code for Web Interface Guidelines compliance. Use when asked to "review my UI", "check accessibility", "audit design", "review UX", or "check my site against best practices". | ui, accessibility, review, needs-network |
 <!-- index:end -->
 
 ## Adding a skill

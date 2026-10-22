@@ -2,6 +2,20 @@
   "generated": "2026-10-22",
   "skills": [
     {
+      "name": "mcp-builder",
+      "category": "mcp",
+      "description": "Guide for creating high-quality MCP (Model Context Protocol) servers that enable LLMs to interact with external services through well-designed tools. Use when building MCP servers to integrate external APIs or services, whether in Python (FastMCP) or Node/TypeScript (MCP SDK).",
+      "path": "skills/mcp/mcp-builder",
+      "license": "Apache-2.0",
+      "source": "https://github.com/anthropics/skills",
+      "tags": [
+        "mcp",
+        "python",
+        "typescript",
+        "needs-network"
+      ]
+    },
+    {
       "name": "vercel-composition-patterns",
       "category": "web",
       "description": "React composition patterns that scale. Use when refactoring components with boolean prop proliferation, building flexible component libraries, or designing reusable APIs. Triggers on tasks involving compound components, render props, context providers, or component architecture. Includes React 19 API changes.",
@@ -45,7 +59,8 @@
       "tags": [
         "ui",
         "accessibility",
-        "review"
+        "review",
+        "needs-network"
       ],
       "metadata": {
         "author": "vercel",
