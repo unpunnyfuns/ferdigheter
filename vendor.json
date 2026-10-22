@@ -35,6 +35,12 @@
     "ref": "main",
     "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44"
   },
+  "python/pytest-skill": {
+    "repo": "https://github.com/LambdaTest/agent-skills",
+    "path": "pytest-skill",
+    "ref": "main",
+    "commit": "992638bccbc311f42c0bd8b2b3387a0d1ce6288d"
+  },
   "web/vercel-composition-patterns": {
     "repo": "https://github.com/vercel-labs/agent-skills",
     "path": "skills/composition-patterns",

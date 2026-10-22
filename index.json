@@ -82,6 +82,23 @@
       ]
     },
     {
+      "name": "pytest-skill",
+      "category": "python",
+      "description": "Generates production-grade pytest tests in Python with fixtures, parametrize, markers, mocking, and conftest patterns. Use when user mentions \"pytest\", \"conftest\", \"@pytest.fixture\", \"@pytest.mark\", \"Python test\". Triggers on: \"pytest\", \"conftest\", \"Python test\", \"parametrize\", \"Python unit test\".",
+      "path": "skills/python/pytest-skill",
+      "license": "MIT",
+      "source": "https://github.com/LambdaTest/agent-skills",
+      "tags": [
+        "python",
+        "pytest",
+        "testing"
+      ],
+      "metadata": {
+        "author": "TestMu AI",
+        "version": "1.0"
+      }
+    },
+    {
       "name": "vercel-composition-patterns",
       "category": "web",
       "description": "React composition patterns that scale. Use when refactoring components with boolean prop proliferation, building flexible component libraries, or designing reusable APIs. Triggers on tasks involving compound components, render props, context providers, or component architecture. Includes React 19 API changes.",
