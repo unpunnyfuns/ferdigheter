@@ -22,6 +22,7 @@ END_MARKER = "<!-- index:end -->"
 
 
 class Skill(NamedTuple):
+    category: str
     dirname: str
     data: dict
 
@@ -55,14 +56,29 @@ def load_skill(skill_dir: Path) -> Skill:
     if not path.is_file():
         raise FrontmatterError("SKILL.md not found")
     data, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
-    return Skill(skill_dir.name, data)
+    return Skill(skill_dir.parent.name, skill_dir.name, data)
+
+
+def _visible_dirs(parent: Path) -> list[Path]:
+    if not parent.is_dir():
+        return []
+    return sorted(p for p in parent.iterdir() if p.is_dir() and not p.name.startswith("_"))
 
 
 def discover(root: Path) -> list[Path]:
-    skills_dir = root / "skills"
-    if not skills_dir.is_dir():
-        return []
-    return sorted(p for p in skills_dir.iterdir() if p.is_dir() and not p.name.startswith("_"))
+    return [
+        skill_dir
+        for category_dir in _visible_dirs(root / "skills")
+        for skill_dir in _visible_dirs(category_dir)
+    ]
+
+
+def stray_skills(root: Path) -> list[Path]:
+    return [d for d in _visible_dirs(root / "skills") if (d / "SKILL.md").is_file()]
+
+
+def skill_label(skill: Skill) -> str:
+    return f"skills/{skill.category}/{skill.dirname}/SKILL.md"
 
 
 def validate_skill(skill: Skill) -> list[str]:
@@ -121,16 +137,36 @@ def validate_skill(skill: Skill) -> list[str]:
 def load_all(root: Path) -> tuple[list[Skill], list[str]]:
     skills: list[Skill] = []
     problems: list[str] = []
+    for stray in stray_skills(root):
+        problems.append(f"skills/{stray.name}/SKILL.md: skills must live under a category folder")
     for skill_dir in discover(root):
-        label = f"skills/{skill_dir.name}/SKILL.md"
+        label = f"skills/{skill_dir.parent.name}/{skill_dir.name}/SKILL.md"
         try:
             skill = load_skill(skill_dir)
         except FrontmatterError as exc:
             problems.append(f"{label}: {exc}")
             continue
+        if not NAME_RE.match(skill.category):
+            problems.append(f"{label}: category {skill.category!r} is not kebab-case")
         problems.extend(f"{label}: {p}" for p in validate_skill(skill))
         skills.append(skill)
+    problems.extend(_duplicate_problems(skills))
     return skills, problems
+
+
+def _duplicate_problems(skills: list[Skill]) -> list[str]:
+    by_name: dict[str, list[Skill]] = {}
+    for skill in skills:
+        by_name.setdefault(skill.dirname, []).append(skill)
+    problems: list[str] = []
+    for skill in skills:
+        others = [s for s in by_name[skill.dirname] if s is not skill]
+        for other in others:
+            problems.append(
+                f"{skill_label(skill)}: duplicate skill name {skill.dirname!r}, "
+                f"also in skills/{other.category}/{other.dirname}"
+            )
+    return problems
 
 
 def index_entry(skill: Skill) -> dict:
@@ -138,7 +174,8 @@ def index_entry(skill: Skill) -> dict:
     entry = {
         "name": data["name"],
         "description": data["description"].strip(),
-        "path": f"skills/{skill.dirname}",
+        "category": skill.category,
+        "path": f"skills/{skill.category}/{skill.dirname}",
     }
     for key in OPTIONAL_FIELDS:
         if key in data:

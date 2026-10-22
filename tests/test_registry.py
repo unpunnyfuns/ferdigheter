@@ -42,10 +42,16 @@ def test_parse_frontmatter_not_mapping():
 VALID = "name: foo\ndescription: Does foo.\n"
 
 
-def make_skill(root: Path, name: str, frontmatter: str = VALID, body: str = "# Foo\n") -> Path:
+def make_skill(
+    root: Path,
+    name: str,
+    frontmatter: str = VALID,
+    body: str = "# Foo\n",
+    category: str = "misc",
+) -> Path:
     if frontmatter == VALID:
         frontmatter = frontmatter.replace("foo", name)
-    skill_dir = root / "skills" / name
+    skill_dir = root / "skills" / category / name
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(f"---\n{frontmatter}---\n\n{body}", encoding="utf-8")
     return skill_dir
@@ -54,21 +60,26 @@ def make_skill(root: Path, name: str, frontmatter: str = VALID, body: str = "# F
 def test_load_skill(tmp_path):
     skill_dir = make_skill(tmp_path, "foo")
     skill = registry.load_skill(skill_dir)
-    assert skill == registry.Skill("foo", {"name": "foo", "description": "Does foo."})
+    assert skill == registry.Skill("misc", "foo", {"name": "foo", "description": "Does foo."})
 
 
 def test_load_skill_missing_file(tmp_path):
-    skill_dir = tmp_path / "skills" / "foo"
+    skill_dir = tmp_path / "skills" / "misc" / "foo"
     skill_dir.mkdir(parents=True)
     with pytest.raises(registry.FrontmatterError, match="SKILL.md not found"):
         registry.load_skill(skill_dir)
 
 
 def test_discover_sorted_and_skips_underscore(tmp_path):
-    make_skill(tmp_path, "zeta")
-    make_skill(tmp_path, "alpha")
-    make_skill(tmp_path, "_template")
-    assert [p.name for p in registry.discover(tmp_path)] == ["alpha", "zeta"]
+    make_skill(tmp_path, "zeta", category="b")
+    make_skill(tmp_path, "alpha", category="b")
+    make_skill(tmp_path, "mid", category="a")
+    make_skill(tmp_path, "_draft", category="a")
+    (tmp_path / "skills" / "_template").mkdir()
+    (tmp_path / "skills" / "_template" / "SKILL.md").write_text("---\nname: x\n---\n")
+    (tmp_path / "skills" / "empty-category").mkdir()
+    found = [(p.parent.name, p.name) for p in registry.discover(tmp_path)]
+    assert found == [("a", "mid"), ("b", "alpha"), ("b", "zeta")]
 
 
 def test_discover_no_skills_dir(tmp_path):
@@ -76,7 +87,10 @@ def test_discover_no_skills_dir(tmp_path):
 
 
 def test_validate_valid():
-    assert registry.validate_skill(registry.Skill("foo", {"name": "foo", "description": "x"})) == []
+    assert (
+        registry.validate_skill(registry.Skill("misc", "foo", {"name": "foo", "description": "x"}))
+        == []
+    )
 
 
 def test_validate_full_optional_fields():
@@ -89,7 +103,7 @@ def test_validate_full_optional_fields():
         "metadata": {"author": "me"},
         "unknown": 1,
     }
-    assert registry.validate_skill(registry.Skill("foo", data)) == []
+    assert registry.validate_skill(registry.Skill("misc", "foo", data)) == []
 
 
 @pytest.mark.parametrize(
@@ -121,26 +135,52 @@ def test_validate_full_optional_fields():
     ],
 )
 def test_validate_problems(dirname, data, message):
-    problems = registry.validate_skill(registry.Skill(dirname, data))
+    problems = registry.validate_skill(registry.Skill("misc", dirname, data))
     assert any(message in p for p in problems), problems
 
 
 def test_load_all_prefixes_problems(tmp_path):
     make_skill(tmp_path, "good")
     make_skill(tmp_path, "bad", "name: other\ndescription: x\n")
-    (tmp_path / "skills" / "empty").mkdir()
+    (tmp_path / "skills" / "misc" / "empty").mkdir()
     skills, problems = registry.load_all(tmp_path)
     assert [s.dirname for s in skills] == ["bad", "good"]
     assert problems == [
-        "skills/bad/SKILL.md: name 'other' does not match folder 'bad'",
-        "skills/empty/SKILL.md: SKILL.md not found",
+        "skills/misc/bad/SKILL.md: name 'other' does not match folder 'bad'",
+        "skills/misc/empty/SKILL.md: SKILL.md not found",
+    ]
+
+
+def test_load_all_rejects_stray_skill(tmp_path):
+    make_skill(tmp_path, "good")
+    stray = tmp_path / "skills" / "loose"
+    stray.mkdir()
+    (stray / "SKILL.md").write_text("---\nname: loose\ndescription: x\n---\n", encoding="utf-8")
+    _, problems = registry.load_all(tmp_path)
+    assert problems == ["skills/loose/SKILL.md: skills must live under a category folder"]
+
+
+def test_load_all_rejects_bad_category_name(tmp_path):
+    make_skill(tmp_path, "good", category="Bad_Cat")
+    _, problems = registry.load_all(tmp_path)
+    assert problems == ["skills/Bad_Cat/good/SKILL.md: category 'Bad_Cat' is not kebab-case"]
+
+
+def test_load_all_rejects_duplicate_names(tmp_path):
+    make_skill(tmp_path, "dup", category="a")
+    make_skill(tmp_path, "dup", category="b")
+    _, problems = registry.load_all(tmp_path)
+    assert problems == [
+        "skills/a/dup/SKILL.md: duplicate skill name 'dup', also in skills/b/dup",
+        "skills/b/dup/SKILL.md: duplicate skill name 'dup', also in skills/a/dup",
     ]
 
 
 def test_build_index_sorts_and_omits_optional():
     skills = [
-        registry.Skill("zeta", {"name": "zeta", "description": " Z \n"}),
+        registry.Skill("misc", "zeta", {"name": "zeta", "description": " Z \n"}),
         registry.Skill(
+            "misc",
             "alpha",
             {
                 "name": "alpha",
@@ -160,13 +200,14 @@ def test_build_index_sorts_and_omits_optional():
             {
                 "name": "alpha",
                 "description": "A",
-                "path": "skills/alpha",
+                "category": "misc",
+                "path": "skills/misc/alpha",
                 "license": "MIT",
                 "source": "https://x",
                 "tags": ["t"],
                 "metadata": {"v": "1"},
             },
-            {"name": "zeta", "description": "Z", "path": "skills/zeta"},
+            {"name": "zeta", "description": "Z", "category": "misc", "path": "skills/misc/zeta"},
         ],
     }
 
@@ -214,7 +255,10 @@ def test_cli_validate_reports_problems(tmp_path, capsys):
     make_repo(tmp_path)
     make_skill(tmp_path, "bad", "name: nope\ndescription: x\n")
     assert registry.main(["--root", str(tmp_path), "validate"]) == 1
-    assert capsys.readouterr().out == "skills/bad/SKILL.md: name 'nope' does not match folder 'bad'\n"
+    assert (
+        capsys.readouterr().out
+        == "skills/misc/bad/SKILL.md: name 'nope' does not match folder 'bad'\n"
+    )
 
 
 def test_cli_build_writes_outputs(tmp_path, capsys):
