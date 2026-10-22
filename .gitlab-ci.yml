@@ -7,36 +7,34 @@ stages:
 
 default:
   before_script:
-    - pip install --quiet -r requirements-dev.txt
+    - pip install --quiet poetry
+    - poetry install --no-interaction
   cache:
-    key: pip
+    key: poetry-$CI_COMMIT_REF_SLUG
     paths:
-      - .cache/pip
-
-variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+      - .venv
 
 lint:
   stage: lint
   script:
-    - ruff check scripts tests
-    - ruff format --check scripts tests
+    - poetry run ruff check scripts tests
+    - poetry run ruff format --check scripts tests
 
 test:
   stage: test
   script:
-    - pytest -q
+    - poetry run pytest -q
 
 validate:
   stage: check
   script:
-    - python scripts/registry.py validate
-    - python scripts/registry.py build --check
+    - poetry run python scripts/registry.py validate
+    - poetry run python scripts/registry.py build --check
 
 upstream-drift:
   stage: check
   script:
-    - python scripts/registry.py sync --check
+    - poetry run python scripts/registry.py sync --check
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"

@@ -14,6 +14,7 @@ Registry of agent skills in the [Agent Skills](https://agentskills.io) format. A
 | `scripts/registry.py` | Validates skills, generates `index.json` and `CATALOG.md`, vendors and updates third-party skills |
 | `scripts/ferdigheter/` | Registry implementation; `scripts/registry.py` is the entry point |
 | `scripts/licenses/` | License templates used by `add` |
+| `pyproject.toml` | Poetry project: one runtime dep (PyYAML), dev group with pytest and ruff |
 
 ## Using a skill
 
@@ -83,10 +84,10 @@ See [CATALOG.md](CATALOG.md) for the full list by category, or [index.json](inde
 3. Build the index:
 
    ```bash
-   # install the runtime deps
-   pip install -r requirements.txt
+   # install deps into .venv (needs Poetry, installed with pipx)
+   poetry install
    # regenerate index.json and CATALOG.md
-   python3 scripts/registry.py build
+   poetry run python scripts/registry.py build
    ```
 
 4. Commit the folder plus the regenerated `index.json` and `CATALOG.md`.
@@ -101,11 +102,11 @@ Needs network access; run it where you have it, then commit and push to the mirr
 
 ```bash
 # report entries with newer upstream commits
-python3 scripts/registry.py sync --check
+poetry run python scripts/registry.py sync --check
 # sync every vendored skill
-python3 scripts/registry.py sync
+poetry run python scripts/registry.py sync
 # sync one vendored skill
-python3 scripts/registry.py sync web/vercel-react-best-practices
+poetry run python scripts/registry.py sync web/vercel-react-best-practices
 ```
 
 `sync` replaces the skill folder with upstream, records the commit in `vendor.json`, and rebuilds the index. It refuses to touch a folder with uncommitted changes.

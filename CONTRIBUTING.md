@@ -9,10 +9,10 @@
 5. Regenerate the index:
 
    ```bash
-   # install the runtime deps
-   pip install -r requirements.txt
+   # install deps into .venv (needs Poetry, installed with pipx)
+   poetry install
    # regenerate index.json and CATALOG.md
-   python3 scripts/registry.py build
+   poetry run python scripts/registry.py build
    ```
 
 6. Commit the skill folder together with the regenerated `index.json` and `CATALOG.md`.
@@ -23,7 +23,7 @@
 
    ```bash
    # pull the skill, set its frontmatter, write a LICENSE and rebuild
-   python3 scripts/registry.py add django/django-expert \
+   poetry run python scripts/registry.py add django/django-expert \
      --repo https://github.com/vintasoftware/django-ai-plugins \
      --path skills/django-expert --license MIT --tags django,python \
      --copyright "2025 Vinta Software"
@@ -32,7 +32,7 @@
    This writes the `vendor.json` entry, pulls the folder, sets `name`, `license`, `source` and `tags` in the frontmatter, writes a `LICENSE` file if upstream has none (templates in `scripts/licenses/`), and rebuilds. `name` comes from the key, so the skill can be renamed on the way in. Add `needs-network` to `--tags` if the skill fetches from the web at runtime.
 
 2. Commit the folder, `vendor.json`, `index.json` and `CATALOG.md`.
-3. Later updates: `python3 scripts/registry.py sync <category>/<name>`.
+3. Later updates: `poetry run python scripts/registry.py sync <category>/<name>`.
 
 If `add` fails the closing build, it prints a cleanup hint; follow it, fix the cause, then run `add` again.
 
@@ -40,25 +40,23 @@ If `add` fails the closing build, it prints a cleanup hint; follow it, fix the c
 
 ```bash
 # check every skill and the manifest
-python3 scripts/registry.py validate
+poetry run python scripts/registry.py validate
 # fail if index.json or CATALOG.md are out of date
-python3 scripts/registry.py build --check
+poetry run python scripts/registry.py build --check
 ```
 
 ## Tests
 
 ```bash
 # run the test suite
-pytest
+poetry run pytest
 ```
 
 ## Lint
 
 ```bash
-# install the dev deps
-pip install -r requirements-dev.txt
 # lint
-ruff check scripts tests
+poetry run ruff check scripts tests
 # format
-ruff format scripts tests
+poetry run ruff format scripts tests
 ```
