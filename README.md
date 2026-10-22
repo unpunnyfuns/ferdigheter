@@ -9,6 +9,7 @@ Registry of agent skills in the [Agent Skills](https://agentskills.io) format. A
 | `skills/<category>/<name>/` | One skill per folder, `SKILL.md` plus supporting files. Category is the parent folder |
 | `skills/_template/` | Starting point for a new skill |
 | `index.json` | Generated machine-readable index |
+| `vendor.json` | Upstream repo, path, ref and last-synced commit for every vendored skill |
 | `scripts/registry.py` | Validates skills, generates `index.json` and the table below |
 
 ## Using a skill
@@ -84,3 +85,15 @@ Each entry has `name`, `category`, `description`, `path`, and optionally `licens
 4. Commit the folder plus the regenerated `index.json` and `README.md`.
 
 Details in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Updating vendored skills
+
+Needs network access; run it where you have it, then commit and push to the mirror.
+
+```sh
+python3 scripts/registry.py sync --check
+python3 scripts/registry.py sync
+python3 scripts/registry.py sync web/vercel-react-best-practices
+```
+
+`sync` replaces the skill folder with upstream, keeps the registry's `license`, `source` and `tags` frontmatter and any `LICENSE` file upstream lacks, records the commit in `vendor.json`, and rebuilds the index. It refuses to touch a folder with uncommitted changes.

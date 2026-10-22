@@ -1,0 +1,23 @@
+{
+  "mcp/mcp-builder": {
+    "repo": "https://github.com/anthropics/skills",
+    "path": "skills/mcp-builder",
+    "ref": "main",
+    "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44"
+  },
+  "web/vercel-composition-patterns": {
+    "repo": "https://github.com/vercel-labs/agent-skills",
+    "path": "skills/composition-patterns",
+    "ref": "main"
+  },
+  "web/vercel-react-best-practices": {
+    "repo": "https://github.com/vercel-labs/agent-skills",
+    "path": "skills/react-best-practices",
+    "ref": "main"
+  },
+  "web/web-design-guidelines": {
+    "repo": "https://github.com/vercel-labs/agent-skills",
+    "path": "skills/web-design-guidelines",
+    "ref": "main"
+  }
+}

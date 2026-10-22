@@ -550,3 +550,64 @@ def test_sync_skill_path_without_skill_md(tmp_path):
     entry = {"repo": url, "path": "docs", "ref": "main"}
     with pytest.raises(FileNotFoundError, match="path 'docs' has no SKILL.md"):
         registry.sync_skill(tmp_path / "reg", "misc/foo", entry)
+
+
+def make_vendored_repo(tmp_path: Path) -> tuple[Path, str, str]:
+    url, sha = make_upstream(tmp_path)
+    root = tmp_path / "reg"
+    init_repo(root)
+    (root / "README.md").write_text(README, encoding="utf-8")
+    make_skill(root, "foo", "name: foo\ndescription: Old.\nlicense: MIT\nsource: https://x\ntags: [a]\n")
+    write_manifest_file(root, {"misc/foo": {"repo": url, "path": "skills/foo", "ref": "main"}})
+    registry.main(["--root", str(root), "build"])
+    commit_all(root, "vendored")
+    return root, url, sha
+
+
+def test_cli_sync_updates_skill_manifest_and_index(tmp_path, capsys):
+    root, _, sha = make_vendored_repo(tmp_path)
+    assert registry.main(["--root", str(root), "sync"]) == 0
+    assert capsys.readouterr().out == f"misc/foo: none -> {sha[:7]}\n"
+    data, _ = registry.parse_frontmatter((root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8"))
+    assert data == {"name": "foo", "description": "Upstream v1.", "license": "MIT", "source": "https://x", "tags": ["a"]}
+    manifest = json.loads((root / "vendor.json").read_text(encoding="utf-8"))
+    assert manifest["misc/foo"]["commit"] == sha
+    index = json.loads((root / "index.json").read_text(encoding="utf-8"))
+    assert index["skills"][0]["description"] == "Upstream v1."
+
+
+def test_cli_sync_check_reports_newer_upstream(tmp_path, capsys):
+    root, _, sha = make_vendored_repo(tmp_path)
+    registry.main(["--root", str(root), "sync"])
+    commit_all(root, "synced")
+    capsys.readouterr()
+    assert registry.main(["--root", str(root), "sync", "--check"]) == 0
+    assert capsys.readouterr().out == ""
+    upstream = tmp_path / "upstream"
+    (upstream / "skills" / "foo" / "SKILL.md").write_text(UPSTREAM_V1.replace("v1", "v2"), encoding="utf-8")
+    new_sha = commit_all(upstream, "v2")
+    assert registry.main(["--root", str(root), "sync", "--check"]) == 1
+    assert capsys.readouterr().out == f"misc/foo: {sha[:7]} -> {new_sha[:7]}\n"
+    assert "v1" in (root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8")
+
+
+def test_cli_sync_refuses_dirty_skill(tmp_path, capsys):
+    root, _, _ = make_vendored_repo(tmp_path)
+    (root / "skills" / "misc" / "foo" / "SKILL.md").write_text("---\nname: foo\ndescription: edited\n---\n", encoding="utf-8")
+    assert registry.main(["--root", str(root), "sync"]) == 1
+    assert capsys.readouterr().out == "skills/misc/foo: has uncommitted changes\n"
+
+
+def test_cli_sync_unknown_key(tmp_path, capsys):
+    root, _, _ = make_vendored_repo(tmp_path)
+    assert registry.main(["--root", str(root), "sync", "misc/nope"]) == 1
+    assert capsys.readouterr().out == "vendor.json: unknown key 'misc/nope'\n"
+
+
+def test_cli_sync_reports_git_failure(tmp_path, capsys):
+    root, _, _ = make_vendored_repo(tmp_path)
+    write_manifest_file(root, {"misc/foo": {"repo": f"file://{tmp_path}/missing", "path": "skills/foo", "ref": "main"}})
+    commit_all(root, "bad repo")
+    assert registry.main(["--root", str(root), "sync"]) == 1
+    out = capsys.readouterr().out
+    assert out.startswith("misc/foo: git clone failed: ")

@@ -368,26 +368,12 @@ def _report(problems: list[str]) -> int:
     return 1 if problems else 0
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
-    sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("validate", help="check every skill, print problems")
-    build = sub.add_parser("build", help="validate, then write index.json and README table")
-    build.add_argument("--check", action="store_true", help="fail if outputs are out of date")
-    args = parser.parse_args(argv)
-    root = args.root.resolve()
-
-    if args.command == "validate":
-        _, problems = load_all(root)
-        return _report(problems)
-
-    today = _existing_generated(root) if args.check else date.today()
+def run_build(root: Path, check: bool) -> int:
+    today = _existing_generated(root) if check else date.today()
     outputs, problems = render_outputs(root, today)
     if problems:
         return _report(problems)
-
-    if args.check:
+    if check:
         stale = [
             path
             for path, content in outputs.items()
@@ -396,10 +382,91 @@ def main(argv: list[str] | None = None) -> int:
         for path in stale:
             print(f"{path.relative_to(root)} is out of date")
         return 1 if stale else 0
-
     for path, content in outputs.items():
         path.write_text(content, encoding="utf-8")
     return 0
+
+
+def _short(commit: str | None) -> str:
+    return commit[:7] if commit else "none"
+
+
+def _first_line(text: str | None) -> str:
+    lines = (text or "").strip().splitlines()
+    return lines[0] if lines else "unknown error"
+
+
+def dirty_keys(root: Path, keys: list[str]) -> list[str]:
+    return [key for key in keys if _git("status", "--porcelain", "--", f"skills/{key}", cwd=root)]
+
+
+def _sync_check(manifest: dict, keys: list[str]) -> int:
+    stale: list[str] = []
+    for key in keys:
+        entry = manifest[key]
+        try:
+            latest = remote_commit(entry["repo"], entry["ref"])
+        except subprocess.CalledProcessError as exc:
+            return _report([f"{key}: git ls-remote failed: {_first_line(exc.stderr)}"])
+        if latest != entry.get("commit"):
+            stale.append(f"{key}: {_short(entry.get('commit'))} -> {_short(latest)}")
+    return _report(stale)
+
+
+def run_sync(root: Path, keys: list[str], check: bool) -> int:
+    manifest, problems = load_manifest(root)
+    if problems:
+        return _report(problems)
+    selected = keys or sorted(manifest)
+    unknown = [key for key in selected if key not in manifest]
+    if unknown:
+        return _report([f"{VENDOR_FILE}: unknown key {key!r}" for key in unknown])
+    if check:
+        return _sync_check(manifest, selected)
+    try:
+        dirty = dirty_keys(root, selected)
+    except subprocess.CalledProcessError as exc:
+        return _report([f"git status failed: {_first_line(exc.stderr)}"])
+    if dirty:
+        return _report([f"skills/{key}: has uncommitted changes" for key in dirty])
+    failures: list[str] = []
+    for key in selected:
+        entry = manifest[key]
+        try:
+            commit = sync_skill(root, key, entry)
+        except subprocess.CalledProcessError as exc:
+            failures.append(f"{key}: git {exc.cmd[1]} failed: {_first_line(exc.stderr)}")
+            break
+        except (FileNotFoundError, FrontmatterError) as exc:
+            failures.append(f"{key}: {exc}")
+            break
+        print(f"{key}: {_short(entry.get('commit'))} -> {_short(commit)}")
+        entry["commit"] = commit
+    write_manifest(root, manifest)
+    if failures:
+        return _report(failures)
+    return run_build(root, check=False)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("validate", help="check every skill, print problems")
+    build = sub.add_parser("build", help="validate, then write index.json and README table")
+    build.add_argument("--check", action="store_true", help="fail if outputs are out of date")
+    sync = sub.add_parser("sync", help="pull vendored skills from upstream per vendor.json")
+    sync.add_argument("keys", nargs="*", help="<category>/<name> entries to sync; default all")
+    sync.add_argument("--check", action="store_true", help="only report entries with newer upstream commits")
+    args = parser.parse_args(argv)
+    root = args.root.resolve()
+
+    if args.command == "validate":
+        _, problems = load_all(root)
+        return _report(problems)
+    if args.command == "sync":
+        return run_sync(root, args.keys, args.check)
+    return run_build(root, args.check)
 
 
 if __name__ == "__main__":

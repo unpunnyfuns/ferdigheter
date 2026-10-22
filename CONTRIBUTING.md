@@ -17,10 +17,11 @@
 
 ## Vendor a third-party skill
 
-1. Copy the upstream skill folder as-is into `skills/<category>/<name>`. Keep its supporting files.
-2. In its `SKILL.md` frontmatter, set `license` to an SPDX id (`MIT`, `Apache-2.0`), `source` to the upstream repo URL, and `tags`. Change nothing else in the folder.
-3. If the upstream folder has no license file, add one named `LICENSE` with the upstream license text and copyright holder.
-4. Continue from step 5 above.
+1. Add an entry to `vendor.json` keyed `<category>/<name>` with `repo`, `path` (folder inside the upstream repo) and `ref` (branch or tag).
+2. Run `python3 scripts/registry.py sync <category>/<name>`. This creates the folder and records the upstream commit.
+3. In `skills/<category>/<name>/SKILL.md` frontmatter, set `license` to an SPDX id, `source` to the upstream repo URL, and `tags`. Sync preserves these on later updates. Change nothing else in the folder.
+4. If upstream ships no license file, add one named `LICENSE` with the license text and copyright holder. Sync keeps it.
+5. Run `python3 scripts/registry.py build` and commit the folder, `vendor.json`, `index.json` and `README.md`.
 
 ## Validate without writing
 
