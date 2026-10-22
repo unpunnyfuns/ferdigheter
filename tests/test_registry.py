@@ -1,5 +1,6 @@
 import pytest
 from pathlib import Path
+from datetime import date
 
 import registry
 
@@ -123,3 +124,61 @@ def test_load_all_prefixes_problems(tmp_path):
         "skills/bad/SKILL.md: name 'other' does not match folder 'bad'",
         "skills/empty/SKILL.md: SKILL.md not found",
     ]
+
+
+def test_build_index_sorts_and_omits_optional():
+    skills = [
+        registry.Skill("zeta", {"name": "zeta", "description": " Z \n"}),
+        registry.Skill(
+            "alpha",
+            {
+                "name": "alpha",
+                "description": "A",
+                "license": "MIT",
+                "source": "https://x",
+                "tags": ["t"],
+                "metadata": {"v": "1"},
+                "ignored": True,
+            },
+        ),
+    ]
+    index = registry.build_index(skills, date(2026, 10, 22))
+    assert index == {
+        "generated": "2026-10-22",
+        "skills": [
+            {
+                "name": "alpha",
+                "description": "A",
+                "path": "skills/alpha",
+                "license": "MIT",
+                "source": "https://x",
+                "tags": ["t"],
+                "metadata": {"v": "1"},
+            },
+            {"name": "zeta", "description": "Z", "path": "skills/zeta"},
+        ],
+    }
+
+
+def test_render_table():
+    entries = [
+        {"name": "a", "description": "Has | pipe\nand newline", "path": "skills/a", "tags": ["x", "y"]},
+        {"name": "b", "description": "Plain", "path": "skills/b"},
+    ]
+    assert registry.render_table(entries) == (
+        "| Skill | Description | Tags |\n"
+        "|---|---|---|\n"
+        "| [a](skills/a/) | Has \\| pipe and newline | x, y |\n"
+        "| [b](skills/b/) | Plain |  |"
+    )
+
+
+def test_splice_readme_replaces_between_markers():
+    text = "# T\n\nintro\n\n<!-- index:start -->\nold\n<!-- index:end -->\n\nfooter\n"
+    out = registry.splice_readme(text, "TABLE")
+    assert out == "# T\n\nintro\n\n<!-- index:start -->\nTABLE\n<!-- index:end -->\n\nfooter\n"
+
+
+def test_splice_readme_missing_markers():
+    with pytest.raises(ValueError, match="markers"):
+        registry.splice_readme("# T\n", "TABLE")

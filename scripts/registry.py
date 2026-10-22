@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 import yaml
+from datetime import date
 from pathlib import Path
 from typing import NamedTuple
 
@@ -12,6 +13,9 @@ from typing import NamedTuple
 NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 MAX_NAME = 64
 MAX_DESCRIPTION = 1024
+OPTIONAL_FIELDS = ("license", "source", "tags", "metadata")
+START_MARKER = "<!-- index:start -->"
+END_MARKER = "<!-- index:end -->"
 
 
 class Skill(NamedTuple):
@@ -116,3 +120,43 @@ def load_all(root: Path) -> tuple[list[Skill], list[str]]:
         problems.extend(f"{label}: {p}" for p in validate_skill(skill))
         skills.append(skill)
     return skills, problems
+
+
+def index_entry(skill: Skill) -> dict:
+    data = skill.data
+    entry = {
+        "name": data["name"],
+        "description": data["description"].strip(),
+        "path": f"skills/{skill.dirname}",
+    }
+    for key in OPTIONAL_FIELDS:
+        if key in data:
+            entry[key] = data[key]
+    return entry
+
+
+def build_index(skills: list[Skill], today: date) -> dict:
+    entries = sorted((index_entry(s) for s in skills), key=lambda e: e["name"])
+    return {"generated": today.isoformat(), "skills": entries}
+
+
+def _cell(text: str) -> str:
+    return " ".join(text.split()).replace("|", "\\|")
+
+
+def render_table(entries: list[dict]) -> str:
+    lines = ["| Skill | Description | Tags |", "|---|---|---|"]
+    for entry in entries:
+        name = entry["name"]
+        tags = ", ".join(entry.get("tags", []))
+        lines.append(f"| [{name}](skills/{name}/) | {_cell(entry['description'])} | {tags} |")
+    return "\n".join(lines)
+
+
+def splice_readme(text: str, table: str) -> str:
+    start = text.find(START_MARKER)
+    end = text.find(END_MARKER)
+    if start == -1 or end == -1 or end < start:
+        raise ValueError("missing index markers")
+    head = text[: start + len(START_MARKER)]
+    return f"{head}\n{table}\n{text[end:]}"
