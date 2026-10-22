@@ -12,6 +12,7 @@ Registry of agent skills in the [Agent Skills](https://agentskills.io) format. A
 | `index.json` | Generated machine-readable index |
 | `vendor.json` | Upstream repo, path, ref and last-synced commit for every vendored skill |
 | `scripts/registry.py` | Validates skills, generates `index.json` and `CATALOG.md`, vendors and updates third-party skills |
+| `scripts/ferdigheter/` | Registry implementation; `scripts/registry.py` is the entry point |
 | `scripts/licenses/` | License templates used by `add` |
 
 ## Using a skill

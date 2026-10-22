@@ -5,40 +5,56 @@ from pathlib import Path
 
 import pytest
 
-import registry
+from ferdigheter.cli import main
+from ferdigheter.commands import _sync_entry_problems
+from ferdigheter.frontmatter import dump_frontmatter, merge_frontmatter, parse_frontmatter
+from ferdigheter.manifest import load_manifest, validate_manifest, write_manifest
+from ferdigheter.model import FrontmatterError, Skill
+from ferdigheter.render import build_index, render_sections, render_table, splice_catalog
+from ferdigheter.skills import discover, load_all, load_skill, validate_skill
+from ferdigheter.vendor import (
+    fetch_upstream,
+    has_license_file,
+    license_text,
+    parse_tags,
+    remote_commit,
+    replace_skill,
+    set_registry_fields,
+    sync_skill,
+)
 
 
 def test_parse_frontmatter_valid():
     text = "---\nname: foo\ndescription: Bar\n---\n\n# Foo\n"
-    data, body = registry.parse_frontmatter(text)
+    data, body = parse_frontmatter(text)
     assert data == {"name": "foo", "description": "Bar"}
     assert body == "\n# Foo\n"
 
 
 def test_parse_frontmatter_closing_marker_at_eof():
-    data, body = registry.parse_frontmatter("---\nname: foo\n---")
+    data, body = parse_frontmatter("---\nname: foo\n---")
     assert data == {"name": "foo"}
     assert body == ""
 
 
 def test_parse_frontmatter_missing():
-    with pytest.raises(registry.FrontmatterError, match="missing frontmatter"):
-        registry.parse_frontmatter("# No frontmatter\n")
+    with pytest.raises(FrontmatterError, match="missing frontmatter"):
+        parse_frontmatter("# No frontmatter\n")
 
 
 def test_parse_frontmatter_unterminated():
-    with pytest.raises(registry.FrontmatterError, match="unterminated"):
-        registry.parse_frontmatter("---\nname: foo\n")
+    with pytest.raises(FrontmatterError, match="unterminated"):
+        parse_frontmatter("---\nname: foo\n")
 
 
 def test_parse_frontmatter_invalid_yaml():
-    with pytest.raises(registry.FrontmatterError, match="invalid yaml"):
-        registry.parse_frontmatter("---\nname: [\n---\n")
+    with pytest.raises(FrontmatterError, match="invalid yaml"):
+        parse_frontmatter("---\nname: [\n---\n")
 
 
 def test_parse_frontmatter_not_mapping():
-    with pytest.raises(registry.FrontmatterError, match="not a mapping"):
-        registry.parse_frontmatter("---\n- a\n---\n")
+    with pytest.raises(FrontmatterError, match="not a mapping"):
+        parse_frontmatter("---\n- a\n---\n")
 
 
 VALID = "name: foo\ndescription: Does foo.\n"
@@ -61,15 +77,15 @@ def make_skill(
 
 def test_load_skill(tmp_path):
     skill_dir = make_skill(tmp_path, "foo")
-    skill = registry.load_skill(skill_dir)
-    assert skill == registry.Skill("misc", "foo", {"name": "foo", "description": "Does foo."})
+    skill = load_skill(skill_dir)
+    assert skill == Skill("misc", "foo", {"name": "foo", "description": "Does foo."})
 
 
 def test_load_skill_missing_file(tmp_path):
     skill_dir = tmp_path / "skills" / "misc" / "foo"
     skill_dir.mkdir(parents=True)
-    with pytest.raises(registry.FrontmatterError, match="SKILL.md not found"):
-        registry.load_skill(skill_dir)
+    with pytest.raises(FrontmatterError, match="SKILL.md not found"):
+        load_skill(skill_dir)
 
 
 def test_discover_sorted_and_skips_underscore(tmp_path):
@@ -80,19 +96,16 @@ def test_discover_sorted_and_skips_underscore(tmp_path):
     (tmp_path / "skills" / "_template").mkdir()
     (tmp_path / "skills" / "_template" / "SKILL.md").write_text("---\nname: x\n---\n")
     (tmp_path / "skills" / "empty-category").mkdir()
-    found = [(p.parent.name, p.name) for p in registry.discover(tmp_path)]
+    found = [(p.parent.name, p.name) for p in discover(tmp_path)]
     assert found == [("a", "mid"), ("b", "alpha"), ("b", "zeta")]
 
 
 def test_discover_no_skills_dir(tmp_path):
-    assert registry.discover(tmp_path) == []
+    assert discover(tmp_path) == []
 
 
 def test_validate_valid():
-    assert (
-        registry.validate_skill(registry.Skill("misc", "foo", {"name": "foo", "description": "x"}))
-        == []
-    )
+    assert validate_skill(Skill("misc", "foo", {"name": "foo", "description": "x"})) == []
 
 
 def test_validate_full_optional_fields():
@@ -105,7 +118,7 @@ def test_validate_full_optional_fields():
         "metadata": {"author": "me"},
         "unknown": 1,
     }
-    assert registry.validate_skill(registry.Skill("misc", "foo", data)) == []
+    assert validate_skill(Skill("misc", "foo", data)) == []
 
 
 @pytest.mark.parametrize(
@@ -138,7 +151,7 @@ def test_validate_full_optional_fields():
     ],
 )
 def test_validate_problems(dirname, data, message):
-    problems = registry.validate_skill(registry.Skill("misc", dirname, data))
+    problems = validate_skill(Skill("misc", dirname, data))
     assert any(message in p for p in problems), problems
 
 
@@ -146,7 +159,7 @@ def test_load_all_prefixes_problems(tmp_path):
     make_skill(tmp_path, "good")
     make_skill(tmp_path, "bad", "name: other\ndescription: x\n")
     (tmp_path / "skills" / "misc" / "empty").mkdir()
-    skills, problems = registry.load_all(tmp_path)
+    skills, problems = load_all(tmp_path)
     assert [s.dirname for s in skills] == ["bad", "good"]
     assert problems == [
         "skills/misc/bad/SKILL.md: name 'other' does not match folder 'bad'",
@@ -159,7 +172,7 @@ def test_load_all_rejects_stray_skill(tmp_path):
     stray = tmp_path / "skills" / "loose"
     stray.mkdir()
     (stray / "SKILL.md").write_text("---\nname: loose\ndescription: x\n---\n", encoding="utf-8")
-    _, problems = registry.load_all(tmp_path)
+    _, problems = load_all(tmp_path)
     assert problems == ["skills/loose/SKILL.md: skills must live under a category folder"]
 
 
@@ -170,7 +183,7 @@ def test_load_all_stray_with_subdirs_reports_once(tmp_path):
     rules = stray / "rules"
     rules.mkdir()
     (rules / "x.md").write_text("not a skill", encoding="utf-8")
-    _, problems = registry.load_all(tmp_path)
+    _, problems = load_all(tmp_path)
     assert problems == ["skills/loose/SKILL.md: skills must live under a category folder"]
 
 
@@ -181,21 +194,21 @@ def test_load_all_ignores_template(tmp_path):
     (template / "SKILL.md").write_text(
         "---\nname: template\ndescription: x\n---\n", encoding="utf-8"
     )
-    skills, problems = registry.load_all(tmp_path)
+    skills, problems = load_all(tmp_path)
     assert problems == []
     assert [s.dirname for s in skills] == ["good"]
 
 
 def test_load_all_rejects_bad_category_name(tmp_path):
     make_skill(tmp_path, "good", category="Bad_Cat")
-    _, problems = registry.load_all(tmp_path)
+    _, problems = load_all(tmp_path)
     assert problems == ["skills/Bad_Cat/good/SKILL.md: category 'Bad_Cat' is not kebab-case"]
 
 
 def test_load_all_rejects_duplicate_names(tmp_path):
     make_skill(tmp_path, "dup", category="a")
     make_skill(tmp_path, "dup", category="b")
-    _, problems = registry.load_all(tmp_path)
+    _, problems = load_all(tmp_path)
     assert problems == [
         "skills/a/dup/SKILL.md: duplicate skill name 'dup', also in skills/b/dup",
         "skills/b/dup/SKILL.md: duplicate skill name 'dup', also in skills/a/dup",
@@ -204,8 +217,8 @@ def test_load_all_rejects_duplicate_names(tmp_path):
 
 def test_build_index_sorts_and_omits_optional():
     skills = [
-        registry.Skill("misc", "zeta", {"name": "zeta", "description": " Z \n"}),
-        registry.Skill(
+        Skill("misc", "zeta", {"name": "zeta", "description": " Z \n"}),
+        Skill(
             "misc",
             "alpha",
             {
@@ -219,7 +232,7 @@ def test_build_index_sorts_and_omits_optional():
             },
         ),
     ]
-    index = registry.build_index(skills, date(2026, 10, 22))
+    index = build_index(skills, date(2026, 10, 22))
     assert index == {
         "generated": "2026-10-22",
         "skills": [
@@ -254,7 +267,7 @@ def test_render_table():
         },
         {"name": "b", "category": "c", "description": "Plain", "path": "skills/c/b"},
     ]
-    assert registry.render_table(entries) == (
+    assert render_table(entries) == (
         "| Skill | Description | Tags |\n"
         "|---|---|---|\n"
         "| [a](skills/c/a/) | Has \\| pipe and newline | x, y |\n"
@@ -268,7 +281,7 @@ def test_render_sections_groups_by_category():
         {"name": "b", "category": "process", "description": "B", "path": "skills/process/b"},
         {"name": "c", "category": "web", "description": "C", "path": "skills/web/c"},
     ]
-    assert registry.render_sections(entries) == (
+    assert render_sections(entries) == (
         "### process\n\n"
         "| Skill | Description | Tags |\n|---|---|---|\n"
         "| [b](skills/process/b/) | B |  |\n"
@@ -281,18 +294,18 @@ def test_render_sections_groups_by_category():
 
 
 def test_render_sections_empty():
-    assert registry.render_sections([]) == ""
+    assert render_sections([]) == ""
 
 
 def test_splice_catalog_replaces_between_markers():
     text = "# T\n\nintro\n\n<!-- index:start -->\nold\n<!-- index:end -->\n\nfooter\n"
-    out = registry.splice_catalog(text, "TABLE")
+    out = splice_catalog(text, "TABLE")
     assert out == "# T\n\nintro\n\n<!-- index:start -->\nTABLE\n<!-- index:end -->\n\nfooter\n"
 
 
 def test_splice_catalog_missing_markers():
     with pytest.raises(ValueError, match="markers"):
-        registry.splice_catalog("# T\n", "TABLE")
+        splice_catalog("# T\n", "TABLE")
 
 
 CATALOG = "# Catalog\n\n<!-- index:start -->\n<!-- index:end -->\n"
@@ -306,14 +319,14 @@ def make_repo(tmp_path: Path) -> Path:
 
 def test_cli_validate_ok(tmp_path, capsys):
     make_repo(tmp_path)
-    assert registry.main(["--root", str(tmp_path), "validate"]) == 0
+    assert main(["--root", str(tmp_path), "validate"]) == 0
     assert capsys.readouterr().out == ""
 
 
 def test_cli_validate_reports_problems(tmp_path, capsys):
     make_repo(tmp_path)
     make_skill(tmp_path, "bad", "name: nope\ndescription: x\n")
-    assert registry.main(["--root", str(tmp_path), "validate"]) == 1
+    assert main(["--root", str(tmp_path), "validate"]) == 1
     assert (
         capsys.readouterr().out
         == "skills/misc/bad/SKILL.md: name 'nope' does not match folder 'bad'\n"
@@ -322,7 +335,7 @@ def test_cli_validate_reports_problems(tmp_path, capsys):
 
 def test_cli_build_writes_outputs(tmp_path, capsys):
     make_repo(tmp_path)
-    assert registry.main(["--root", str(tmp_path), "build"]) == 0
+    assert main(["--root", str(tmp_path), "build"]) == 0
     assert capsys.readouterr().out == ""
     index = json.loads((tmp_path / "index.json").read_text(encoding="utf-8"))
     assert index["generated"] == date.today().isoformat()
@@ -337,38 +350,38 @@ def test_cli_build_writes_outputs(tmp_path, capsys):
 def test_cli_build_refuses_on_problems(tmp_path):
     make_repo(tmp_path)
     make_skill(tmp_path, "bad", "name: nope\ndescription: x\n")
-    assert registry.main(["--root", str(tmp_path), "build"]) == 1
+    assert main(["--root", str(tmp_path), "build"]) == 1
     assert not (tmp_path / "index.json").exists()
 
 
 def test_cli_build_missing_markers(tmp_path, capsys):
     make_repo(tmp_path)
     (tmp_path / "CATALOG.md").write_text("# no markers\n", encoding="utf-8")
-    assert registry.main(["--root", str(tmp_path), "build"]) == 1
+    assert main(["--root", str(tmp_path), "build"]) == 1
     assert capsys.readouterr().out == "CATALOG.md: missing index markers\n"
 
 
 def test_cli_build_check(tmp_path, capsys):
     make_repo(tmp_path)
-    assert registry.main(["--root", str(tmp_path), "build", "--check"]) == 1
+    assert main(["--root", str(tmp_path), "build", "--check"]) == 1
     assert capsys.readouterr().out == "index.json is out of date\nCATALOG.md is out of date\n"
     assert not (tmp_path / "index.json").exists()
 
-    registry.main(["--root", str(tmp_path), "build"])
-    assert registry.main(["--root", str(tmp_path), "build", "--check"]) == 0
+    main(["--root", str(tmp_path), "build"])
+    assert main(["--root", str(tmp_path), "build", "--check"]) == 0
 
     make_skill(tmp_path, "bar")
-    assert registry.main(["--root", str(tmp_path), "build", "--check"]) == 1
+    assert main(["--root", str(tmp_path), "build", "--check"]) == 1
 
 
 def test_cli_build_check_keeps_existing_date(tmp_path):
     make_repo(tmp_path)
-    registry.main(["--root", str(tmp_path), "build"])
+    main(["--root", str(tmp_path), "build"])
     index_path = tmp_path / "index.json"
     index = json.loads(index_path.read_text(encoding="utf-8"))
     index["generated"] = "2000-01-01"
     index_path.write_text(json.dumps(index, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    assert registry.main(["--root", str(tmp_path), "build", "--check"]) == 0
+    assert main(["--root", str(tmp_path), "build", "--check"]) == 0
 
 
 def write_manifest_file(root: Path, manifest) -> None:
@@ -376,23 +389,23 @@ def write_manifest_file(root: Path, manifest) -> None:
 
 
 def test_load_manifest_missing_is_empty(tmp_path):
-    assert registry.load_manifest(tmp_path) == ({}, [])
+    assert load_manifest(tmp_path) == ({}, [])
 
 
 def test_load_manifest_invalid_json(tmp_path):
     (tmp_path / "vendor.json").write_text("{", encoding="utf-8")
-    manifest, problems = registry.load_manifest(tmp_path)
+    manifest, problems = load_manifest(tmp_path)
     assert manifest == {}
     assert problems[0].startswith("vendor.json: invalid json:")
 
 
 def test_load_manifest_not_object(tmp_path):
     write_manifest_file(tmp_path, [])
-    assert registry.load_manifest(tmp_path) == ({}, ["vendor.json: must be a JSON object"])
+    assert load_manifest(tmp_path) == ({}, ["vendor.json: must be a JSON object"])
 
 
 def test_write_manifest_sorts_keys(tmp_path):
-    registry.write_manifest(
+    write_manifest(
         tmp_path,
         {
             "b/x": {"repo": "r", "path": "p", "ref": "main"},
@@ -406,9 +419,9 @@ def test_write_manifest_sorts_keys(tmp_path):
 
 def test_validate_manifest_ok(tmp_path):
     make_skill(tmp_path, "foo", "name: foo\ndescription: x\nsource: https://x\n")
-    skills, _ = registry.load_all(tmp_path)
+    skills, _ = load_all(tmp_path)
     manifest = {"misc/foo": {"repo": "https://x", "path": "skills/foo", "ref": "main"}}
-    assert registry.validate_manifest(tmp_path, manifest, skills) == []
+    assert validate_manifest(tmp_path, manifest, skills) == []
 
 
 @pytest.mark.parametrize(
@@ -435,14 +448,14 @@ def test_validate_manifest_ok(tmp_path):
 )
 def test_validate_manifest_problems(tmp_path, manifest, message):
     make_skill(tmp_path, "foo")
-    skills, _ = registry.load_all(tmp_path)
-    assert message in registry.validate_manifest(tmp_path, manifest, skills)
+    skills, _ = load_all(tmp_path)
+    assert message in validate_manifest(tmp_path, manifest, skills)
 
 
 def test_validate_manifest_source_without_entry(tmp_path):
     make_skill(tmp_path, "foo", "name: foo\ndescription: x\nsource: https://x\n")
-    skills, _ = registry.load_all(tmp_path)
-    assert registry.validate_manifest(tmp_path, {}, skills) == [
+    skills, _ = load_all(tmp_path)
+    assert validate_manifest(tmp_path, {}, skills) == [
         "skills/misc/foo/SKILL.md: has source but no vendor.json entry"
     ]
 
@@ -450,7 +463,7 @@ def test_validate_manifest_source_without_entry(tmp_path):
 def test_load_all_includes_manifest_problems(tmp_path):
     make_skill(tmp_path, "foo", "name: foo\ndescription: x\nsource: https://x\n")
     write_manifest_file(tmp_path, {"misc/gone": {"repo": "r", "path": "p", "ref": "main"}})
-    _, problems = registry.load_all(tmp_path)
+    _, problems = load_all(tmp_path)
     assert problems == [
         "vendor.json: 'misc/gone' has no skill folder",
         "skills/misc/foo/SKILL.md: has source but no vendor.json entry",
@@ -498,15 +511,15 @@ def make_upstream(
 
 def test_dump_frontmatter_round_trip():
     text = "---\nname: foo\ndescription: 'Quoted: yes'\ntags:\n- a\n---\n\n# Body\n"
-    data, body = registry.parse_frontmatter(text)
-    assert registry.parse_frontmatter(registry.dump_frontmatter(data, body)) == (data, body)
+    data, body = parse_frontmatter(text)
+    assert parse_frontmatter(dump_frontmatter(data, body)) == (data, body)
 
 
 def test_merge_frontmatter_appends_registry_fields_last():
-    merged = registry.merge_frontmatter(
+    merged = merge_frontmatter(
         UPSTREAM_V1, {"license": "MIT", "source": "https://x", "tags": ["a"]}
     )
-    data, body = registry.parse_frontmatter(merged)
+    data, body = parse_frontmatter(merged)
     assert list(data) == ["name", "description", "license", "source", "tags"]
     assert data["license"] == "MIT"
     assert body == "\n# Foo v1\n"
@@ -514,28 +527,28 @@ def test_merge_frontmatter_appends_registry_fields_last():
 
 def test_merge_frontmatter_strips_trailing_whitespace_in_strings():
     upstream = "---\nname: foo\ndescription: >\n  Folded text.\n\n\nlanguages:\n- a \n---\n\n# B\n"
-    data, _ = registry.parse_frontmatter(registry.merge_frontmatter(upstream, {}))
+    data, _ = parse_frontmatter(merge_frontmatter(upstream, {}))
     assert data["description"] == "Folded text."
     assert data["languages"] == ["a"]
 
 
 def test_merge_frontmatter_without_overrides_drops_upstream_registry_fields():
-    data, _ = registry.parse_frontmatter(registry.merge_frontmatter(UPSTREAM_V1, {}))
+    data, _ = parse_frontmatter(merge_frontmatter(UPSTREAM_V1, {}))
     assert "license" not in data
 
 
 def test_fetch_upstream_and_remote_commit(tmp_path):
     url, sha = make_upstream(tmp_path)
     dest = tmp_path / "clone"
-    assert registry.fetch_upstream(url, "main", dest) == sha
+    assert fetch_upstream(url, "main", dest) == sha
     assert (dest / "skills" / "foo" / "SKILL.md").is_file()
-    assert registry.remote_commit(url, "main") == sha
+    assert remote_commit(url, "main") == sha
 
 
 def test_remote_commit_unknown_ref(tmp_path):
     url, _ = make_upstream(tmp_path)
     with pytest.raises(subprocess.CalledProcessError):
-        registry.remote_commit(url, "nope")
+        remote_commit(url, "nope")
 
 
 def test_replace_skill_keeps_registry_fields_and_license(tmp_path):
@@ -550,8 +563,8 @@ def test_replace_skill_keeps_registry_fields_and_license(tmp_path):
     upstream.mkdir()
     (upstream / "SKILL.md").write_text(UPSTREAM_V1, encoding="utf-8")
     (upstream / "reference.md").write_text("new\n", encoding="utf-8")
-    registry.replace_skill(skill_dir, upstream)
-    data, body = registry.parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
+    replace_skill(skill_dir, upstream)
+    data, body = parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
     assert data == {
         "name": "foo",
         "description": "Upstream v1.",
@@ -572,7 +585,7 @@ def test_replace_skill_prefers_upstream_license(tmp_path):
     upstream.mkdir()
     (upstream / "SKILL.md").write_text(UPSTREAM_V1, encoding="utf-8")
     (upstream / "LICENSE").write_text("theirs\n", encoding="utf-8")
-    registry.replace_skill(skill_dir, upstream)
+    replace_skill(skill_dir, upstream)
     assert (skill_dir / "LICENSE").read_text(encoding="utf-8") == "theirs\n"
 
 
@@ -581,8 +594,8 @@ def test_sync_skill_creates_missing_folder(tmp_path):
     root = tmp_path / "reg"
     root.mkdir()
     entry = {"repo": url, "path": "skills/foo", "ref": "main"}
-    assert registry.sync_skill(root, "misc/foo", entry) == sha
-    data, _ = registry.parse_frontmatter(
+    assert sync_skill(root, "misc/foo", entry) == sha
+    data, _ = parse_frontmatter(
         (root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8")
     )
     assert data == {"name": "foo", "description": "Upstream v1."}
@@ -592,7 +605,7 @@ def test_sync_skill_missing_path(tmp_path):
     url, _ = make_upstream(tmp_path)
     entry = {"repo": url, "path": "skills/nope", "ref": "main"}
     with pytest.raises(FileNotFoundError, match=r"path 'skills/nope' not found in file://.*@main"):
-        registry.sync_skill(tmp_path / "reg", "misc/foo", entry)
+        sync_skill(tmp_path / "reg", "misc/foo", entry)
 
 
 def test_sync_skill_path_without_skill_md(tmp_path):
@@ -603,7 +616,7 @@ def test_sync_skill_path_without_skill_md(tmp_path):
     commit_all(repo, "docs")
     entry = {"repo": url, "path": "docs", "ref": "main"}
     with pytest.raises(FileNotFoundError, match="path 'docs' has no SKILL.md"):
-        registry.sync_skill(tmp_path / "reg", "misc/foo", entry)
+        sync_skill(tmp_path / "reg", "misc/foo", entry)
 
 
 def make_vendored_repo(tmp_path: Path) -> tuple[Path, str, str]:
@@ -615,16 +628,16 @@ def make_vendored_repo(tmp_path: Path) -> tuple[Path, str, str]:
         root, "foo", "name: foo\ndescription: Old.\nlicense: MIT\nsource: https://x\ntags: [a]\n"
     )
     write_manifest_file(root, {"misc/foo": {"repo": url, "path": "skills/foo", "ref": "main"}})
-    registry.main(["--root", str(root), "build"])
+    main(["--root", str(root), "build"])
     commit_all(root, "vendored")
     return root, url, sha
 
 
 def test_cli_sync_updates_skill_manifest_and_index(tmp_path, capsys):
     root, _, sha = make_vendored_repo(tmp_path)
-    assert registry.main(["--root", str(root), "sync"]) == 0
+    assert main(["--root", str(root), "sync"]) == 0
     assert capsys.readouterr().out == f"misc/foo: none -> {sha[:7]}\n"
-    data, _ = registry.parse_frontmatter(
+    data, _ = parse_frontmatter(
         (root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8")
     )
     assert data == {
@@ -642,17 +655,17 @@ def test_cli_sync_updates_skill_manifest_and_index(tmp_path, capsys):
 
 def test_cli_sync_check_reports_newer_upstream(tmp_path, capsys):
     root, _, sha = make_vendored_repo(tmp_path)
-    registry.main(["--root", str(root), "sync"])
+    main(["--root", str(root), "sync"])
     commit_all(root, "synced")
     capsys.readouterr()
-    assert registry.main(["--root", str(root), "sync", "--check"]) == 0
+    assert main(["--root", str(root), "sync", "--check"]) == 0
     assert capsys.readouterr().out == ""
     upstream = tmp_path / "upstream"
     (upstream / "skills" / "foo" / "SKILL.md").write_text(
         UPSTREAM_V1.replace("v1", "v2"), encoding="utf-8"
     )
     new_sha = commit_all(upstream, "v2")
-    assert registry.main(["--root", str(root), "sync", "--check"]) == 1
+    assert main(["--root", str(root), "sync", "--check"]) == 1
     assert capsys.readouterr().out == f"misc/foo: {sha[:7]} -> {new_sha[:7]}\n"
     assert "v1" in (root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8")
 
@@ -662,13 +675,13 @@ def test_cli_sync_refuses_dirty_skill(tmp_path, capsys):
     (root / "skills" / "misc" / "foo" / "SKILL.md").write_text(
         "---\nname: foo\ndescription: edited\n---\n", encoding="utf-8"
     )
-    assert registry.main(["--root", str(root), "sync"]) == 1
+    assert main(["--root", str(root), "sync"]) == 1
     assert capsys.readouterr().out == "skills/misc/foo: has uncommitted changes\n"
 
 
 def test_cli_sync_unknown_key(tmp_path, capsys):
     root, _, _ = make_vendored_repo(tmp_path)
-    assert registry.main(["--root", str(root), "sync", "misc/nope"]) == 1
+    assert main(["--root", str(root), "sync", "misc/nope"]) == 1
     assert capsys.readouterr().out == "vendor.json: unknown key 'misc/nope'\n"
 
 
@@ -679,16 +692,16 @@ def test_cli_sync_reports_git_failure(tmp_path, capsys):
         {"misc/foo": {"repo": f"file://{tmp_path}/missing", "path": "skills/foo", "ref": "main"}},
     )
     commit_all(root, "bad repo")
-    assert registry.main(["--root", str(root), "sync"]) == 1
+    assert main(["--root", str(root), "sync"]) == 1
     out = capsys.readouterr().out
     assert out.startswith("misc/foo: git clone failed: ")
 
 
 def test_merge_frontmatter_keeps_registry_name_in_place():
-    merged = registry.merge_frontmatter(
+    merged = merge_frontmatter(
         UPSTREAM_V1, {"name": "vercel-foo", "license": "MIT", "source": "https://x", "tags": ["a"]}
     )
-    data, body = registry.parse_frontmatter(merged)
+    data, body = parse_frontmatter(merged)
     assert list(data) == ["name", "description", "license", "source", "tags"]
     assert data["name"] == "vercel-foo"
     assert body == "\n# Foo v1\n"
@@ -703,8 +716,8 @@ def test_replace_skill_keeps_registry_name(tmp_path):
     upstream = tmp_path / "up"
     upstream.mkdir()
     (upstream / "SKILL.md").write_text(UPSTREAM_V1, encoding="utf-8")
-    registry.replace_skill(skill_dir, upstream)
-    data, _ = registry.parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
+    replace_skill(skill_dir, upstream)
+    data, _ = parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
     assert list(data) == ["name", "description", "license", "source", "tags"]
     assert data["name"] == "vercel-foo"
     assert data["description"] == "Upstream v1."
@@ -737,13 +750,11 @@ def test_replace_skill_keeps_registry_name(tmp_path):
     ],
 )
 def test_sync_entry_problems(key, entry, message):
-    assert registry._sync_entry_problems(key, entry) == [message]
+    assert _sync_entry_problems(key, entry) == [message]
 
 
 def test_sync_entry_problems_accepts_nested_path():
-    assert (
-        registry._sync_entry_problems("misc/foo", {"repo": "r", "path": "a/b", "ref": "main"}) == []
-    )
+    assert _sync_entry_problems("misc/foo", {"repo": "r", "path": "a/b", "ref": "main"}) == []
 
 
 @pytest.mark.parametrize("check", [False, True])
@@ -774,7 +785,7 @@ def test_cli_sync_rejects_bad_entry(tmp_path, capsys, manifest, message, check):
     before = (root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8")
     write_manifest_file(root, manifest)
     argv = ["--root", str(root), "sync"] + (["--check"] if check else [])
-    assert registry.main(argv) == 1
+    assert main(argv) == 1
     assert capsys.readouterr().out == f"{message}\n"
     assert (root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8") == before
 
@@ -791,7 +802,7 @@ def test_cli_sync_repo_cannot_smuggle_git_option(tmp_path, capsys, check, failur
     )
     commit_all(root, "option-like repo")
     argv = ["--root", str(root), "sync"] + (["--check"] if check else [])
-    assert registry.main(argv) == 1
+    assert main(argv) == 1
     assert capsys.readouterr().out.startswith(failure)
 
 
@@ -800,10 +811,10 @@ def test_cli_sync_annotated_tag(tmp_path, capsys):
     git(tmp_path / "upstream", "tag", "-a", "v1", "-m", "v1")
     write_manifest_file(root, {"misc/foo": {"repo": url, "path": "skills/foo", "ref": "v1"}})
     commit_all(root, "pin v1")
-    assert registry.main(["--root", str(root), "sync"]) == 0
+    assert main(["--root", str(root), "sync"]) == 0
     assert capsys.readouterr().out == f"misc/foo: none -> {sha[:7]}\n"
     commit_all(root, "synced")
-    assert registry.main(["--root", str(root), "sync", "--check"]) == 0
+    assert main(["--root", str(root), "sync", "--check"]) == 0
     assert capsys.readouterr().out == ""
 
 
@@ -816,7 +827,7 @@ def test_remote_commit_prefers_branch_over_same_name_tag(tmp_path):
     )
     new_sha = commit_all(upstream, "v2")
     git(upstream, "branch", "dup")
-    assert registry.remote_commit(url, "dup") == new_sha
+    assert remote_commit(url, "dup") == new_sha
     assert new_sha != old_sha
 
 
@@ -826,16 +837,16 @@ def test_sync_skill_bad_upstream_frontmatter_keeps_old_folder(tmp_path):
     skill_dir = make_skill(root, "foo", "name: foo\ndescription: Old.\nlicense: MIT\n")
     (skill_dir / "extra.md").write_text("keep\n", encoding="utf-8")
     entry = {"repo": url, "path": "skills/foo", "ref": "main"}
-    with pytest.raises(registry.FrontmatterError, match="unterminated"):
-        registry.sync_skill(root, "misc/foo", entry)
+    with pytest.raises(FrontmatterError, match="unterminated"):
+        sync_skill(root, "misc/foo", entry)
     assert (skill_dir / "extra.md").read_text(encoding="utf-8") == "keep\n"
-    data, _ = registry.parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
+    data, _ = parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
     assert data["description"] == "Old."
 
 
 def test_cli_sync_without_manifest_writes_nothing(tmp_path, capsys):
     make_repo(tmp_path)
-    assert registry.main(["--root", str(tmp_path), "sync"]) == 0
+    assert main(["--root", str(tmp_path), "sync"]) == 0
     assert capsys.readouterr().out == ""
     assert not (tmp_path / "vendor.json").exists()
 
@@ -845,56 +856,56 @@ def test_cli_sync_refuses_untracked_file_in_subdir(tmp_path, capsys):
     rules = root / "skills" / "misc" / "foo" / "rules"
     rules.mkdir()
     (rules / "extra.md").write_text("new\n", encoding="utf-8")
-    assert registry.main(["--root", str(root), "sync"]) == 1
+    assert main(["--root", str(root), "sync"]) == 1
     assert capsys.readouterr().out == "skills/misc/foo: has uncommitted changes\n"
 
 
 def test_parse_tags():
-    assert registry.parse_tags("a, b-c,,d") == ["a", "b-c", "d"]
-    assert registry.parse_tags("") == []
+    assert parse_tags("a, b-c,,d") == ["a", "b-c", "d"]
+    assert parse_tags("") == []
 
 
 def test_parse_tags_rejects_bad():
     with pytest.raises(ValueError, match="tags must be kebab-case, comma-separated"):
-        registry.parse_tags("Bad Tag")
+        parse_tags("Bad Tag")
 
 
 def test_license_text_mit_substitutes():
-    text = registry.license_text("MIT", "2025 Someone")
+    text = license_text("MIT", "2025 Someone")
     assert text.startswith("MIT License\n\nCopyright (c) 2025 Someone\n")
 
 
 def test_license_text_mit_needs_copyright():
     with pytest.raises(ValueError, match="copyright required"):
-        registry.license_text("MIT", None)
+        license_text("MIT", None)
 
 
 def test_license_text_apache_verbatim():
-    text = registry.license_text("Apache-2.0", None)
+    text = license_text("Apache-2.0", None)
     assert "Apache License" in text and "{copyright}" not in text
 
 
 def test_license_text_unknown():
-    assert registry.license_text("WTFPL", "x") is None
+    assert license_text("WTFPL", "x") is None
 
 
 def test_license_text_rejects_path_like_spdx():
-    assert registry.license_text("../../requirements", "x") is None
-    assert registry.license_text("MIT/../x", "x") is None
+    assert license_text("../../requirements", "x") is None
+    assert license_text("MIT/../x", "x") is None
 
 
 def test_has_license_file(tmp_path):
-    assert not registry.has_license_file(tmp_path)
+    assert not has_license_file(tmp_path)
     (tmp_path / "license.md").write_text("x", encoding="utf-8")
-    assert registry.has_license_file(tmp_path)
+    assert has_license_file(tmp_path)
 
 
 def test_set_registry_fields(tmp_path):
     skill_dir = make_skill(tmp_path, "foo", "name: foo\ndescription: D.\nlicense: old\n")
-    registry.set_registry_fields(
+    set_registry_fields(
         skill_dir / "SKILL.md", {"license": "MIT", "source": "https://x", "tags": ["a"]}
     )
-    data, body = registry.parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
+    data, body = parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
     assert data == {
         "name": "foo",
         "description": "D.",
@@ -932,12 +943,12 @@ def test_cli_add_vendors_skill(tmp_path, capsys):
         "--copyright",
         "2025 Up",
     ]
-    assert registry.main(argv) == 0
+    assert main(argv) == 0
     assert (
         capsys.readouterr().out == f"misc/foo: none -> {sha[:7]}\nwrote skills/misc/foo/LICENSE\n"
     )
     skill_md = root / "skills" / "misc" / "foo" / "SKILL.md"
-    data, _ = registry.parse_frontmatter(skill_md.read_text(encoding="utf-8"))
+    data, _ = parse_frontmatter(skill_md.read_text(encoding="utf-8"))
     assert data == {
         "name": "foo",
         "description": "Upstream v1.",
@@ -955,7 +966,7 @@ def test_cli_add_vendors_skill(tmp_path, capsys):
     assert "| [foo](skills/misc/foo/) | Upstream v1. | a, b |" in (root / "CATALOG.md").read_text(
         encoding="utf-8"
     )
-    assert registry.main(["--root", str(root), "validate"]) == 0
+    assert main(["--root", str(root), "validate"]) == 0
 
 
 def test_cli_add_skips_license_when_upstream_has_one(tmp_path, capsys):
@@ -975,13 +986,13 @@ def test_cli_add_skips_license_when_upstream_has_one(tmp_path, capsys):
         "--copyright",
         "x",
     ]
-    assert registry.main(argv) == 0
+    assert main(argv) == 0
     out = capsys.readouterr().out
     assert "wrote" not in out
     assert "LICENSE:" not in out
     assert not (root / "skills" / "misc" / "foo" / "LICENSE").exists()
     skill_md = root / "skills" / "misc" / "foo" / "SKILL.md"
-    data, _ = registry.parse_frontmatter(skill_md.read_text(encoding="utf-8"))
+    data, _ = parse_frontmatter(skill_md.read_text(encoding="utf-8"))
     assert "tags" not in data
 
 
@@ -1000,7 +1011,7 @@ def test_cli_add_hint_when_copyright_missing(tmp_path, capsys):
         "--license",
         "MIT",
     ]
-    assert registry.main(argv) == 0
+    assert main(argv) == 0
     assert (
         capsys.readouterr().out.splitlines()[1]
         == "skills/misc/foo/LICENSE: not written, pass --copyright"
@@ -1022,7 +1033,7 @@ def test_cli_add_hint_when_no_template(tmp_path, capsys):
         "--license",
         "WTFPL",
     ]
-    assert registry.main(argv) == 0
+    assert main(argv) == 0
     assert (
         capsys.readouterr().out.splitlines()[1]
         == "skills/misc/foo/LICENSE: no template for WTFPL, add it manually"
@@ -1046,13 +1057,13 @@ def test_cli_add_rejects_existing_key_and_folder(tmp_path, capsys):
         "--copyright",
         "x",
     ]
-    assert registry.main(argv) == 0
+    assert main(argv) == 0
     commit_all(root, "added")
     capsys.readouterr()
-    assert registry.main(argv) == 1
+    assert main(argv) == 1
     assert capsys.readouterr().out == "vendor.json: 'misc/foo' already exists\n"
     write_manifest_file(root, {})
-    assert registry.main(argv) == 1
+    assert main(argv) == 1
     assert capsys.readouterr().out == "skills/misc/foo: already exists\n"
 
 
@@ -1060,12 +1071,12 @@ def test_cli_add_rejects_bad_tags_and_path(tmp_path, capsys):
     url, _ = make_upstream(tmp_path)
     root = make_bare_registry(tmp_path)
     base = ["--root", str(root), "add", "misc/foo", "--repo", url, "--license", "MIT"]
-    assert registry.main(base + ["--path", "../x"]) == 1
+    assert main(base + ["--path", "../x"]) == 1
     assert (
         capsys.readouterr().out
         == "vendor.json: 'misc/foo' path must be a relative path inside the repo\n"
     )
-    assert registry.main(base + ["--path", "skills/foo", "--tags", "Bad Tag"]) == 1
+    assert main(base + ["--path", "skills/foo", "--tags", "Bad Tag"]) == 1
     assert capsys.readouterr().out == "tags must be kebab-case, comma-separated\n"
     assert not (root / "vendor.json").exists()
 
@@ -1084,7 +1095,7 @@ def test_cli_add_git_failure_leaves_no_manifest_entry(tmp_path, capsys):
         "--license",
         "MIT",
     ]
-    assert registry.main(argv) == 1
+    assert main(argv) == 1
     assert capsys.readouterr().out.startswith("misc/foo: git clone failed: ")
     assert not (root / "vendor.json").exists()
 
@@ -1106,12 +1117,12 @@ def test_cli_add_sets_name_from_key(tmp_path, capsys):
         "--copyright",
         "2025 Up",
     ]
-    assert registry.main(argv) == 0
+    assert main(argv) == 0
     skill_md = root / "skills" / "misc" / "vercel-foo" / "SKILL.md"
-    data, _ = registry.parse_frontmatter(skill_md.read_text(encoding="utf-8"))
+    data, _ = parse_frontmatter(skill_md.read_text(encoding="utf-8"))
     assert data["name"] == "vercel-foo"
     capsys.readouterr()
-    assert registry.main(["--root", str(root), "validate"]) == 0
+    assert main(["--root", str(root), "validate"]) == 0
     assert "| [vercel-foo](skills/misc/vercel-foo/) |" in (root / "CATALOG.md").read_text(
         encoding="utf-8"
     )
@@ -1132,7 +1143,7 @@ def test_cli_add_rejects_empty_license(tmp_path, capsys):
         "--license",
         "",
     ]
-    assert registry.main(argv) == 1
+    assert main(argv) == 1
     assert capsys.readouterr().out == "license must be a non-empty string\n"
     assert not (root / "vendor.json").exists()
     assert not (root / "skills" / "misc" / "foo").exists()
@@ -1155,7 +1166,7 @@ def test_cli_add_rejects_name_used_in_another_category(tmp_path, capsys):
         "--license",
         "MIT",
     ]
-    assert registry.main(argv) == 1
+    assert main(argv) == 1
     assert (
         capsys.readouterr().out == "skills/misc/foo: name 'foo' already used in skills/other/foo\n"
     )
@@ -1181,7 +1192,7 @@ def test_cli_add_prints_cleanup_hint_when_build_fails(tmp_path, capsys):
         "--copyright",
         "2025 Up",
     ]
-    assert registry.main(argv) == 1
+    assert main(argv) == 1
     lines = capsys.readouterr().out.splitlines()
     assert lines[-1] == (
         "skills/misc/foo: added but validation failed; clean up with: "
