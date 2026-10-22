@@ -23,7 +23,7 @@ Every skill is a folder with a `SKILL.md`, grouped by category.
 
    ```bash
    # clone the registry
-   git clone https://github.com/<owner>/ferdigheter
+   git clone <url-of-this-repo> ferdigheter
    ```
 
 2. Copy or symlink the skill folder into wherever your agent looks for skills.
@@ -34,7 +34,7 @@ Hermes can add this repo as a tap:
 
 ```bash
 # add this repo as a Hermes tap
-hermes skills tap add <owner>/ferdigheter
+hermes skills tap add <url-of-this-repo>
 ```
 
 Manual install:
@@ -67,7 +67,7 @@ Copy `skills/<category>/<name>` into `~/.claude/skills/<name>` or `.claude/skill
 
 ```bash
 # list every indexed skill
-curl -s https://raw.githubusercontent.com/<owner>/ferdigheter/main/index.json | jq '.skills[] | {name, category, description, path}'
+jq '.skills[] | {name, category, description, path}' index.json
 ```
 
 Each entry has `name`, `category`, `description`, `path`, and optionally `license`, `source`, `tags`, `metadata`.
