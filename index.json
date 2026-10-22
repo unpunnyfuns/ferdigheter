@@ -2,6 +2,72 @@
   "generated": "2026-10-22",
   "skills": [
     {
+      "name": "cdrf-expert",
+      "category": "django",
+      "description": "Expert guidance for Django REST Framework class-based views using Classy DRF (https://www.cdrf.co). Use when selecting or debugging APIView, GenericAPIView, concrete generic views, mixin combinations, or ViewSet/GenericViewSet/ModelViewSet behavior; tracing method resolution order (MRO); understanding which method to override (`create` vs `perform_create`, `update` vs `perform_update`, `destroy` vs `perform_destroy`, `get_queryset`, `get_serializer_class`); and comparing behavior across DRF versions. Do not use for function-based views, GraphQL, FastAPI/Flask, frontend work, or non-DRF backend frameworks.",
+      "path": "skills/django/cdrf-expert",
+      "license": "MIT",
+      "source": "https://github.com/vintasoftware/django-ai-plugins",
+      "tags": [
+        "django",
+        "drf",
+        "python",
+        "needs-network"
+      ]
+    },
+    {
+      "name": "django-celery-expert",
+      "category": "django",
+      "description": "Expert Django Celery guidance for asynchronous task processing. Use when designing background tasks, configuring Celery workers, handling task retries and errors, optimizing Celery performance, implementing periodic tasks with Celery Beat, or setting up production monitoring for Celery. Do not use for general Django questions unrelated to Celery, non-Celery task systems (Django Q, Huey, RQ), ML/data pipeline orchestration (Airflow, Prefect), or frontend and API-only concerns. Follows Vinta's Django Celery best practices.",
+      "path": "skills/django/django-celery-expert",
+      "license": "MIT",
+      "source": "https://github.com/vintasoftware/django-ai-plugins",
+      "tags": [
+        "django",
+        "celery",
+        "python"
+      ]
+    },
+    {
+      "name": "django-expert",
+      "category": "django",
+      "description": "Expert Django backend development guidance. Use when creating Django models, views, serializers, or APIs; debugging ORM queries or migrations; optimizing database performance; implementing authentication; writing tests; or working with Django REST Framework. Follows Django best practices and modern patterns.",
+      "path": "skills/django/django-expert",
+      "license": "MIT",
+      "source": "https://github.com/vintasoftware/django-ai-plugins",
+      "tags": [
+        "django",
+        "python"
+      ]
+    },
+    {
+      "name": "django-reviewer",
+      "category": "django",
+      "description": "Review Django and Python changes for clarity, consistency, maintainability, ORM or DRF anti-patterns, and project conventions while preserving behavior. Use after Django code changes or when the user explicitly requests review. Report findings by default; apply refinements only when the user expresses explicit edit intent or the host has already authorized edits.",
+      "path": "skills/django/django-reviewer",
+      "license": "MIT",
+      "source": "https://github.com/vintasoftware/django-ai-plugins",
+      "tags": [
+        "django",
+        "python",
+        "review"
+      ]
+    },
+    {
+      "name": "django-safe-migration",
+      "category": "django",
+      "description": "Write, review, and rewrite Django migrations for PostgreSQL with zero-downtime guarantees. Use this skill whenever the user mentions migrations, Django schema changes, or deployment safety — even if they don't say \"zero downtime\" explicitly. Trigger on: \"review this migration\", \"is this migration safe?\", \"write a migration for...\", \"rewrite this migration\", \"how do I add a NOT NULL column / drop a column / add an index / rename a column / add a FK without downtime\", \"will this migration cause locks?\", \"this migration is blocking production\". Covers: SeparateDatabaseAndState two-file splits, AddIndexConcurrently, FK NOT VALID + VALIDATE, db_default for NOT NULL columns, lock_timeout, and RunPython safety rules.",
+      "path": "skills/django/django-safe-migration",
+      "license": "MIT",
+      "source": "https://github.com/vintasoftware/django-ai-plugins",
+      "tags": [
+        "django",
+        "postgres",
+        "migrations",
+        "python"
+      ]
+    },
+    {
       "name": "mcp-builder",
       "category": "mcp",
       "description": "Guide for creating high-quality MCP (Model Context Protocol) servers that enable LLMs to interact with external services through well-designed tools. Use when building MCP servers to integrate external APIs or services, whether in Python (FastMCP) or Node/TypeScript (MCP SDK).",

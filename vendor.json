@@ -1,4 +1,34 @@
 {
+  "django/cdrf-expert": {
+    "repo": "https://github.com/vintasoftware/django-ai-plugins",
+    "path": "skills/cdrf-expert",
+    "ref": "main",
+    "commit": "b8af2688d994747666e6a793d441365807d6772f"
+  },
+  "django/django-celery-expert": {
+    "repo": "https://github.com/vintasoftware/django-ai-plugins",
+    "path": "skills/django-celery-expert",
+    "ref": "main",
+    "commit": "b8af2688d994747666e6a793d441365807d6772f"
+  },
+  "django/django-expert": {
+    "repo": "https://github.com/vintasoftware/django-ai-plugins",
+    "path": "skills/django-expert",
+    "ref": "main",
+    "commit": "b8af2688d994747666e6a793d441365807d6772f"
+  },
+  "django/django-reviewer": {
+    "repo": "https://github.com/vintasoftware/django-ai-plugins",
+    "path": "skills/django-reviewer",
+    "ref": "main",
+    "commit": "b8af2688d994747666e6a793d441365807d6772f"
+  },
+  "django/django-safe-migration": {
+    "repo": "https://github.com/vintasoftware/django-ai-plugins",
+    "path": "skills/django-safe-migration",
+    "ref": "main",
+    "commit": "b8af2688d994747666e6a793d441365807d6772f"
+  },
   "mcp/mcp-builder": {
     "repo": "https://github.com/anthropics/skills",
     "path": "skills/mcp-builder",
