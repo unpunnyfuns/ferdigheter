@@ -839,3 +839,54 @@ def test_cli_sync_refuses_untracked_file_in_subdir(tmp_path, capsys):
     (rules / "extra.md").write_text("new\n", encoding="utf-8")
     assert registry.main(["--root", str(root), "sync"]) == 1
     assert capsys.readouterr().out == "skills/misc/foo: has uncommitted changes\n"
+
+
+def test_parse_tags():
+    assert registry.parse_tags("a, b-c,,d") == ["a", "b-c", "d"]
+    assert registry.parse_tags("") == []
+
+
+def test_parse_tags_rejects_bad():
+    with pytest.raises(ValueError, match="tags must be kebab-case, comma-separated"):
+        registry.parse_tags("Bad Tag")
+
+
+def test_license_text_mit_substitutes():
+    text = registry.license_text("MIT", "2025 Someone")
+    assert text.startswith("MIT License\n\nCopyright (c) 2025 Someone\n")
+
+
+def test_license_text_mit_needs_copyright():
+    with pytest.raises(ValueError, match="copyright required"):
+        registry.license_text("MIT", None)
+
+
+def test_license_text_apache_verbatim():
+    text = registry.license_text("Apache-2.0", None)
+    assert "Apache License" in text and "{copyright}" not in text
+
+
+def test_license_text_unknown():
+    assert registry.license_text("WTFPL", "x") is None
+
+
+def test_has_license_file(tmp_path):
+    assert not registry.has_license_file(tmp_path)
+    (tmp_path / "license.md").write_text("x", encoding="utf-8")
+    assert registry.has_license_file(tmp_path)
+
+
+def test_set_registry_fields(tmp_path):
+    skill_dir = make_skill(tmp_path, "foo", "name: foo\ndescription: D.\nlicense: old\n")
+    registry.set_registry_fields(
+        skill_dir / "SKILL.md", {"license": "MIT", "source": "https://x", "tags": ["a"]}
+    )
+    data, body = registry.parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
+    assert data == {
+        "name": "foo",
+        "description": "D.",
+        "license": "MIT",
+        "source": "https://x",
+        "tags": ["a"],
+    }
+    assert body == "\n# Foo\n"

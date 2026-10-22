@@ -25,6 +25,7 @@ START_MARKER = "<!-- index:start -->"
 END_MARKER = "<!-- index:end -->"
 VENDOR_FILE = "vendor.json"
 KEY_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$")
+LICENSE_DIR = Path(__file__).resolve().parent / "licenses"
 
 
 class Skill(NamedTuple):
@@ -309,6 +310,34 @@ def sync_skill(root: Path, key: str, entry: dict) -> str:
             raise FileNotFoundError(f"path {entry['path']!r} has no SKILL.md")
         replace_skill(root / "skills" / key, upstream_dir)
     return commit
+
+
+def parse_tags(text: str) -> list[str]:
+    tags = [t.strip() for t in text.split(",") if t.strip()]
+    if not all(NAME_RE.match(t) for t in tags):
+        raise ValueError("tags must be kebab-case, comma-separated")
+    return tags
+
+
+def license_text(spdx: str, copyright: str | None) -> str | None:
+    template = LICENSE_DIR / f"{spdx}.txt"
+    if not template.is_file():
+        return None
+    text = template.read_text(encoding="utf-8")
+    if "{copyright}" in text:
+        if copyright is None:
+            raise ValueError("copyright required")
+        text = text.replace("{copyright}", copyright)
+    return text
+
+
+def has_license_file(skill_dir: Path) -> bool:
+    return any(p.is_file() and p.name.upper().startswith("LICENSE") for p in skill_dir.iterdir())
+
+
+def set_registry_fields(skill_md: Path, fields: dict) -> None:
+    merged = merge_frontmatter(skill_md.read_text(encoding="utf-8"), fields)
+    skill_md.write_text(merged, encoding="utf-8")
 
 
 def index_entry(skill: Skill) -> dict:
