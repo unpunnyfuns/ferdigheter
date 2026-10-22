@@ -137,9 +137,12 @@ def validate_skill(skill: Skill) -> list[str]:
 def load_all(root: Path) -> tuple[list[Skill], list[str]]:
     skills: list[Skill] = []
     problems: list[str] = []
-    for stray in stray_skills(root):
+    strays = stray_skills(root)
+    for stray in strays:
         problems.append(f"skills/{stray.name}/SKILL.md: skills must live under a category folder")
     for skill_dir in discover(root):
+        if skill_dir.parent in strays:
+            continue
         label = f"skills/{skill_dir.parent.name}/{skill_dir.name}/SKILL.md"
         try:
             skill = load_skill(skill_dir)

@@ -48,12 +48,12 @@ Or point `opencode.json` at a clone of this repo:
 
 ### Claude Code and others
 
-Copy `skills/<category>/<name>` into `~/.claude/skills/<name>` or `.claude/skills/<name>`. OpenCode and Hermes also read `.agents/skills/<name>`; Claude Code does not.
+Copy `skills/<category>/<name>` into `~/.claude/skills/<name>` or `.claude/skills/<name>`. OpenCode and Hermes also scan `.agents/skills/`; Claude Code does not.
 
 ### Machine-readable index
 
 ```sh
-curl -s https://raw.githubusercontent.com/<owner>/ferdigheter/main/index.json | jq '.skills[] | {name, description, path}'
+curl -s https://raw.githubusercontent.com/<owner>/ferdigheter/main/index.json | jq '.skills[] | {name, category, description, path}'
 ```
 
 Each entry has `name`, `category`, `description`, `path`, and optionally `license`, `source`, `tags`, `metadata`.
@@ -72,10 +72,8 @@ Each entry has `name`, `category`, `description`, `path`, and optionally `licens
 
 ## Adding a skill
 
-1. `cp -R skills/_template skills/<category>/<name>`
+1. `cp -R skills/_template skills/<category>/<name>`. Reuse an existing category folder or create a new kebab-case one.
 2. Edit `skills/<category>/<name>/SKILL.md`. `name` must equal the folder name, lowercase kebab-case. `description` is required. Third-party skills get `license` and `source`.
-
-Pick an existing category folder or create a new lowercase one.
 3. `pip install -r requirements.txt && python3 scripts/registry.py build`
 4. Commit the folder plus the regenerated `index.json` and `README.md`.
 

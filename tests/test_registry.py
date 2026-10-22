@@ -160,6 +160,29 @@ def test_load_all_rejects_stray_skill(tmp_path):
     assert problems == ["skills/loose/SKILL.md: skills must live under a category folder"]
 
 
+def test_load_all_stray_with_subdirs_reports_once(tmp_path):
+    stray = tmp_path / "skills" / "loose"
+    stray.mkdir(parents=True)
+    (stray / "SKILL.md").write_text("---\nname: loose\ndescription: x\n---\n", encoding="utf-8")
+    rules = stray / "rules"
+    rules.mkdir()
+    (rules / "x.md").write_text("not a skill", encoding="utf-8")
+    _, problems = registry.load_all(tmp_path)
+    assert problems == ["skills/loose/SKILL.md: skills must live under a category folder"]
+
+
+def test_load_all_ignores_template(tmp_path):
+    make_skill(tmp_path, "good")
+    template = tmp_path / "skills" / "_template"
+    template.mkdir()
+    (template / "SKILL.md").write_text(
+        "---\nname: template\ndescription: x\n---\n", encoding="utf-8"
+    )
+    skills, problems = registry.load_all(tmp_path)
+    assert problems == []
+    assert [s.dirname for s in skills] == ["good"]
+
+
 def test_load_all_rejects_bad_category_name(tmp_path):
     make_skill(tmp_path, "good", category="Bad_Cat")
     _, problems = registry.load_all(tmp_path)
@@ -246,6 +269,10 @@ def test_render_sections_groups_by_category():
         "| [a](skills/web/a/) | A |  |\n"
         "| [c](skills/web/c/) | C |  |"
     )
+
+
+def test_render_sections_empty():
+    assert registry.render_sections([]) == ""
 
 
 def test_splice_readme_replaces_between_markers():
