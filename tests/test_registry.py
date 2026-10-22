@@ -512,6 +512,13 @@ def test_merge_frontmatter_appends_registry_fields_last():
     assert body == "\n# Foo v1\n"
 
 
+def test_merge_frontmatter_strips_trailing_whitespace_in_strings():
+    upstream = "---\nname: foo\ndescription: >\n  Folded text.\n\n\nlanguages:\n- a \n---\n\n# B\n"
+    data, _ = registry.parse_frontmatter(registry.merge_frontmatter(upstream, {}))
+    assert data["description"] == "Folded text."
+    assert data["languages"] == ["a"]
+
+
 def test_merge_frontmatter_without_overrides_drops_upstream_registry_fields():
     data, _ = registry.parse_frontmatter(registry.merge_frontmatter(UPSTREAM_V1, {}))
     assert "license" not in data

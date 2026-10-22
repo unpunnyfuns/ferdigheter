@@ -234,8 +234,19 @@ def registry_fields(data: dict) -> dict:
     return {key: data[key] for key in REGISTRY_FIELDS if key in data}
 
 
+def _rstrip_strings(value: object) -> object:
+    if isinstance(value, str):
+        return value.rstrip()
+    if isinstance(value, list):
+        return [_rstrip_strings(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _rstrip_strings(v) for k, v in value.items()}
+    return value
+
+
 def merge_frontmatter(upstream_text: str, overrides: dict) -> str:
     data, body = parse_frontmatter(upstream_text)
+    data = _rstrip_strings(data)
     if "name" in overrides:
         data["name"] = overrides["name"]
     upstream_only = {key: value for key, value in data.items() if key not in REGISTRY_FIELDS}
