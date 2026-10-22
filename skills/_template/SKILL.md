@@ -11,6 +11,7 @@ metadata:
 
 # My Skill
 
-Instructions for the agent go here. Keep the description above under 1024
-characters; put everything else in the body or in supporting files next to
-this one.
+Instructions for the agent go here. This folder lives at
+`skills/<category>/<name>/`; `name` above must equal the folder name. Keep the
+description under 1024 characters; put everything else in the body or in
+supporting files next to this one.

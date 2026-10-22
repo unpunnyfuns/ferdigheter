@@ -3,8 +3,9 @@
   "skills": [
     {
       "name": "vercel-composition-patterns",
+      "category": "web",
       "description": "React composition patterns that scale. Use when refactoring components with boolean prop proliferation, building flexible component libraries, or designing reusable APIs. Triggers on tasks involving compound components, render props, context providers, or component architecture. Includes React 19 API changes.",
-      "path": "skills/vercel-composition-patterns",
+      "path": "skills/web/vercel-composition-patterns",
       "license": "MIT",
       "source": "https://github.com/vercel-labs/agent-skills",
       "tags": [
@@ -19,8 +20,9 @@
     },
     {
       "name": "vercel-react-best-practices",
+      "category": "web",
       "description": "React and Next.js performance optimization guidelines from Vercel Engineering. This skill should be used when writing, reviewing, or refactoring React/Next.js code to ensure optimal performance patterns. Triggers on tasks involving React components, Next.js pages, data fetching, bundle optimization, or performance improvements.",
-      "path": "skills/vercel-react-best-practices",
+      "path": "skills/web/vercel-react-best-practices",
       "license": "MIT",
       "source": "https://github.com/vercel-labs/agent-skills",
       "tags": [
@@ -35,8 +37,9 @@
     },
     {
       "name": "web-design-guidelines",
+      "category": "web",
       "description": "Review UI code for Web Interface Guidelines compliance. Use when asked to \"review my UI\", \"check accessibility\", \"audit design\", \"review UX\", or \"check my site against best practices\".",
-      "path": "skills/web-design-guidelines",
+      "path": "skills/web/web-design-guidelines",
       "license": "MIT",
       "source": "https://github.com/vercel-labs/agent-skills",
       "tags": [
