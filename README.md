@@ -98,6 +98,8 @@ Details in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Updating vendored skills
 
+New third-party skills are added with `add`; see CONTRIBUTING.
+
 Needs network access; run it where you have it, then commit and push to the mirror.
 
 ```sh

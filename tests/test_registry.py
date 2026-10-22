@@ -895,3 +895,183 @@ def test_set_registry_fields(tmp_path):
         "tags": ["a"],
     }
     assert body == "\n# Foo\n"
+
+
+def make_bare_registry(tmp_path: Path) -> Path:
+    root = tmp_path / "reg"
+    init_repo(root)
+    (root / "README.md").write_text(README, encoding="utf-8")
+    commit_all(root, "init")
+    return root
+
+
+def test_cli_add_vendors_skill(tmp_path, capsys):
+    url, sha = make_upstream(tmp_path)
+    root = make_bare_registry(tmp_path)
+    argv = [
+        "--root",
+        str(root),
+        "add",
+        "misc/foo",
+        "--repo",
+        url,
+        "--path",
+        "skills/foo",
+        "--license",
+        "MIT",
+        "--tags",
+        "a,b",
+        "--copyright",
+        "2025 Up",
+    ]
+    assert registry.main(argv) == 0
+    assert (
+        capsys.readouterr().out == f"misc/foo: none -> {sha[:7]}\nwrote skills/misc/foo/LICENSE\n"
+    )
+    skill_md = root / "skills" / "misc" / "foo" / "SKILL.md"
+    data, _ = registry.parse_frontmatter(skill_md.read_text(encoding="utf-8"))
+    assert data == {
+        "name": "foo",
+        "description": "Upstream v1.",
+        "license": "MIT",
+        "source": url,
+        "tags": ["a", "b"],
+    }
+    assert (
+        (root / "skills" / "misc" / "foo" / "LICENSE")
+        .read_text(encoding="utf-8")
+        .startswith("MIT License\n\nCopyright (c) 2025 Up\n")
+    )
+    manifest = json.loads((root / "vendor.json").read_text(encoding="utf-8"))
+    assert manifest["misc/foo"] == {"repo": url, "path": "skills/foo", "ref": "main", "commit": sha}
+    assert "| [foo](skills/misc/foo/) | Upstream v1. | a, b |" in (root / "README.md").read_text(
+        encoding="utf-8"
+    )
+    assert registry.main(["--root", str(root), "validate"]) == 0
+
+
+def test_cli_add_skips_license_when_upstream_has_one(tmp_path, capsys):
+    url, _ = make_upstream(tmp_path, extra={"LICENSE.txt": "theirs\n"})
+    root = make_bare_registry(tmp_path)
+    argv = [
+        "--root",
+        str(root),
+        "add",
+        "misc/foo",
+        "--repo",
+        url,
+        "--path",
+        "skills/foo",
+        "--license",
+        "MIT",
+    ]
+    assert registry.main(argv) == 0
+    assert "wrote" not in capsys.readouterr().out
+    assert not (root / "skills" / "misc" / "foo" / "LICENSE").exists()
+    skill_md = root / "skills" / "misc" / "foo" / "SKILL.md"
+    data, _ = registry.parse_frontmatter(skill_md.read_text(encoding="utf-8"))
+    assert "tags" not in data
+
+
+def test_cli_add_hint_when_copyright_missing(tmp_path, capsys):
+    url, _ = make_upstream(tmp_path)
+    root = make_bare_registry(tmp_path)
+    argv = [
+        "--root",
+        str(root),
+        "add",
+        "misc/foo",
+        "--repo",
+        url,
+        "--path",
+        "skills/foo",
+        "--license",
+        "MIT",
+    ]
+    assert registry.main(argv) == 0
+    assert (
+        capsys.readouterr().out.splitlines()[1]
+        == "skills/misc/foo/LICENSE: not written, pass --copyright"
+    )
+
+
+def test_cli_add_hint_when_no_template(tmp_path, capsys):
+    url, _ = make_upstream(tmp_path)
+    root = make_bare_registry(tmp_path)
+    argv = [
+        "--root",
+        str(root),
+        "add",
+        "misc/foo",
+        "--repo",
+        url,
+        "--path",
+        "skills/foo",
+        "--license",
+        "WTFPL",
+    ]
+    assert registry.main(argv) == 0
+    assert (
+        capsys.readouterr().out.splitlines()[1]
+        == "skills/misc/foo/LICENSE: no template for WTFPL, add it manually"
+    )
+
+
+def test_cli_add_rejects_existing_key_and_folder(tmp_path, capsys):
+    url, _ = make_upstream(tmp_path)
+    root = make_bare_registry(tmp_path)
+    argv = [
+        "--root",
+        str(root),
+        "add",
+        "misc/foo",
+        "--repo",
+        url,
+        "--path",
+        "skills/foo",
+        "--license",
+        "MIT",
+        "--copyright",
+        "x",
+    ]
+    assert registry.main(argv) == 0
+    commit_all(root, "added")
+    capsys.readouterr()
+    assert registry.main(argv) == 1
+    assert capsys.readouterr().out == "vendor.json: 'misc/foo' already exists\n"
+    write_manifest_file(root, {})
+    assert registry.main(argv) == 1
+    assert capsys.readouterr().out == "skills/misc/foo: already exists\n"
+
+
+def test_cli_add_rejects_bad_tags_and_path(tmp_path, capsys):
+    url, _ = make_upstream(tmp_path)
+    root = make_bare_registry(tmp_path)
+    base = ["--root", str(root), "add", "misc/foo", "--repo", url, "--license", "MIT"]
+    assert registry.main(base + ["--path", "../x"]) == 1
+    assert (
+        capsys.readouterr().out
+        == "vendor.json: 'misc/foo' path must be a relative path inside the repo\n"
+    )
+    assert registry.main(base + ["--path", "skills/foo", "--tags", "Bad Tag"]) == 1
+    assert capsys.readouterr().out == "tags must be kebab-case, comma-separated\n"
+    assert not (root / "vendor.json").exists()
+
+
+def test_cli_add_git_failure_leaves_no_manifest_entry(tmp_path, capsys):
+    root = make_bare_registry(tmp_path)
+    argv = [
+        "--root",
+        str(root),
+        "add",
+        "misc/foo",
+        "--repo",
+        f"file://{tmp_path}/missing",
+        "--path",
+        "skills/foo",
+        "--license",
+        "MIT",
+    ]
+    assert registry.main(argv) == 1
+    assert capsys.readouterr().out.startswith("misc/foo: git clone failed: ")
+    assert not (root / "vendor.json").exists()

@@ -17,11 +17,16 @@
 
 ## Vendor a third-party skill
 
-1. Add an entry to `vendor.json` keyed `<category>/<name>` with `repo`, `path` (folder inside the upstream repo) and `ref` (branch or tag).
-2. Run `python3 scripts/registry.py sync <category>/<name>`. This creates the folder and records the upstream commit. Do not run `validate` or `build` between steps 1 and 2; they will complain about the missing folder.
-3. In `skills/<category>/<name>/SKILL.md` frontmatter, set `license` to an SPDX id, `source` to the upstream repo URL, and `tags`. Sync preserves these on later updates. Change nothing else in the folder.
-4. If upstream ships no license file, add one named `LICENSE` with the license text and copyright holder. Sync keeps it.
-5. Run `python3 scripts/registry.py build` and commit the folder, `vendor.json`, `index.json` and `README.md`.
+```sh
+python3 scripts/registry.py add django/django-expert \
+  --repo https://github.com/vintasoftware/django-ai-plugins \
+  --path skills/django-expert --license MIT --tags django,python \
+  --copyright "2025 Vinta Software"
+```
+
+This writes the `vendor.json` entry, pulls the folder, sets `license`, `source` and `tags` in the frontmatter, writes a `LICENSE` file if upstream has none (templates in `scripts/licenses/`), and rebuilds. Add `needs-network` to `--tags` if the skill fetches from the web at runtime. Then commit the folder, `vendor.json`, `index.json` and `README.md`.
+
+Later updates: `python3 scripts/registry.py sync <category>/<name>`.
 
 ## Validate without writing
 

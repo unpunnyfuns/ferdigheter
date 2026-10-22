@@ -119,7 +119,7 @@ def validate_skill(skill: Skill) -> list[str]:
 
     if "source" in data:
         source = data["source"]
-        if not isinstance(source, str) or not source.startswith("https://"):
+        if not isinstance(source, str) or not source.startswith(("https://", "file://")):
             problems.append("source must be an https:// URL")
 
     if "tags" in data:
@@ -527,6 +527,63 @@ def run_sync(root: Path, keys: list[str], check: bool) -> int:
     return run_build(root, check=False)
 
 
+def run_add(
+    root: Path,
+    key: str,
+    repo: str,
+    path: str,
+    ref: str,
+    spdx: str,
+    tags_text: str,
+    copyright: str | None,
+) -> int:
+    entry = {"repo": repo, "path": path, "ref": ref}
+    problems = _sync_entry_problems(key, entry)
+    if problems:
+        return _report(problems)
+    manifest, problems = load_manifest(root)
+    if problems:
+        return _report(problems)
+    if key in manifest:
+        return _report([f"{VENDOR_FILE}: {key!r} already exists"])
+    skill_dir = root / "skills" / key
+    if skill_dir.exists():
+        return _report([f"skills/{key}: already exists"])
+    try:
+        tags = parse_tags(tags_text)
+    except ValueError as exc:
+        return _report([str(exc)])
+    try:
+        commit = sync_skill(root, key, entry)
+    except subprocess.CalledProcessError as exc:
+        return _report([f"{key}: git {exc.cmd[1]} failed: {_first_line(exc.stderr)}"])
+    except (FileNotFoundError, FrontmatterError) as exc:
+        return _report([f"{key}: {exc}"])
+    print(f"{key}: none -> {_short(commit)}")
+    manifest[key] = {**entry, "commit": commit}
+    write_manifest(root, manifest)
+    fields = {"license": spdx, "source": repo}
+    if tags:
+        fields["tags"] = tags
+    set_registry_fields(skill_dir / "SKILL.md", fields)
+    if not has_license_file(skill_dir):
+        _write_license(skill_dir, key, spdx, copyright)
+    return run_build(root, check=False)
+
+
+def _write_license(skill_dir: Path, key: str, spdx: str, copyright: str | None) -> None:
+    try:
+        text = license_text(spdx, copyright)
+    except ValueError:
+        print(f"skills/{key}/LICENSE: not written, pass --copyright")
+        return
+    if text is None:
+        print(f"skills/{key}/LICENSE: no template for {spdx}, add it manually")
+        return
+    (skill_dir / "LICENSE").write_text(text, encoding="utf-8")
+    print(f"wrote skills/{key}/LICENSE")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
@@ -539,6 +596,14 @@ def main(argv: list[str] | None = None) -> int:
     sync.add_argument(
         "--check", action="store_true", help="only report entries with newer upstream commits"
     )
+    add = sub.add_parser("add", help="vendor a third-party skill in one step")
+    add.add_argument("key", help="<category>/<name>")
+    add.add_argument("--repo", required=True, help="git URL of the upstream repo")
+    add.add_argument("--path", required=True, help="skill folder inside the upstream repo")
+    add.add_argument("--ref", default="main", help="branch or tag, default main")
+    add.add_argument("--license", required=True, help="SPDX id, e.g. MIT or Apache-2.0")
+    add.add_argument("--tags", default="", help="comma-separated kebab-case tags")
+    add.add_argument("--copyright", help='copyright line for generated LICENSE, e.g. "2025 Vendor"')
     args = parser.parse_args(argv)
     root = args.root.resolve()
 
@@ -547,6 +612,10 @@ def main(argv: list[str] | None = None) -> int:
         return _report(problems)
     if args.command == "sync":
         return run_sync(root, args.keys, args.check)
+    if args.command == "add":
+        return run_add(
+            root, args.key, args.repo, args.path, args.ref, args.license, args.tags, args.copyright
+        )
     return run_build(root, args.check)
 
 
