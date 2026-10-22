@@ -1,0 +1,43 @@
+image: python:3.12
+
+stages:
+  - lint
+  - test
+  - check
+
+default:
+  before_script:
+    - pip install --quiet -r requirements-dev.txt
+  cache:
+    key: pip
+    paths:
+      - .cache/pip
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+lint:
+  stage: lint
+  script:
+    - ruff check scripts tests
+    - ruff format --check scripts tests
+
+test:
+  stage: test
+  script:
+    - pytest -q
+
+validate:
+  stage: check
+  script:
+    - python scripts/registry.py validate
+    - python scripts/registry.py build --check
+
+upstream-drift:
+  stage: check
+  script:
+    - python scripts/registry.py sync --check
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - when: manual
