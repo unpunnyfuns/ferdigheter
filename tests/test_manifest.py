@@ -1,8 +1,43 @@
 import pytest
 
 from conftest import make_skill, write_manifest_file
+from ferdigheter.commands import _sync_entry_problems
 from ferdigheter.manifest import load_manifest, validate_manifest, write_manifest
 from ferdigheter.skills import load_all
+
+
+@pytest.mark.parametrize(
+    "key, entry, message",
+    [
+        (
+            "misc/foo",
+            {"repo": "r", "path": "p"},
+            "vendor.json: 'misc/foo' needs repo, path and ref",
+        ),
+        ("misc/foo", "nope", "vendor.json: 'misc/foo' needs repo, path and ref"),
+        (
+            "misc/foo",
+            {"repo": "r", "path": "../x", "ref": "main"},
+            "vendor.json: 'misc/foo' path must be a relative path inside the repo",
+        ),
+        (
+            "misc/foo",
+            {"repo": "r", "path": "/etc", "ref": "main"},
+            "vendor.json: 'misc/foo' path must be a relative path inside the repo",
+        ),
+        (
+            "../docs",
+            {"repo": "r", "path": "p", "ref": "main"},
+            "vendor.json: key '../docs' is not <category>/<name>",
+        ),
+    ],
+)
+def test_sync_entry_problems(key, entry, message):
+    assert _sync_entry_problems(key, entry) == [message]
+
+
+def test_sync_entry_problems_accepts_nested_path():
+    assert _sync_entry_problems("misc/foo", {"repo": "r", "path": "a/b", "ref": "main"}) == []
 
 
 def test_load_manifest_missing_is_empty(tmp_path):
