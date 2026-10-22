@@ -1,8 +1,9 @@
-import pytest
-from pathlib import Path
-from datetime import date
 import json
 import subprocess
+from datetime import date
+from pathlib import Path
+
+import pytest
 
 import registry
 
@@ -243,7 +244,13 @@ def test_build_index_sorts_and_omits_optional():
 
 def test_render_table():
     entries = [
-        {"name": "a", "category": "c", "description": "Has | pipe\nand newline", "path": "skills/c/a", "tags": ["x", "y"]},
+        {
+            "name": "a",
+            "category": "c",
+            "description": "Has | pipe\nand newline",
+            "path": "skills/c/a",
+            "tags": ["x", "y"],
+        },
         {"name": "b", "category": "c", "description": "Plain", "path": "skills/c/b"},
     ]
     assert registry.render_table(entries) == (
@@ -384,7 +391,13 @@ def test_load_manifest_not_object(tmp_path):
 
 
 def test_write_manifest_sorts_keys(tmp_path):
-    registry.write_manifest(tmp_path, {"b/x": {"repo": "r", "path": "p", "ref": "main"}, "a/y": {"repo": "r", "path": "p", "ref": "main"}})
+    registry.write_manifest(
+        tmp_path,
+        {
+            "b/x": {"repo": "r", "path": "p", "ref": "main"},
+            "a/y": {"repo": "r", "path": "p", "ref": "main"},
+        },
+    )
     text = (tmp_path / "vendor.json").read_text(encoding="utf-8")
     assert text.startswith('{\n  "a/y": {')
     assert text.endswith("}\n")
@@ -400,10 +413,22 @@ def test_validate_manifest_ok(tmp_path):
 @pytest.mark.parametrize(
     "manifest, message",
     [
-        ({"Bad Key": {"repo": "r", "path": "p", "ref": "main"}}, "vendor.json: key 'Bad Key' is not <category>/<name>"),
-        ({"misc/nope": {"repo": "r", "path": "p", "ref": "main"}}, "vendor.json: 'misc/nope' has no skill folder"),
-        ({"misc/foo": {"repo": "r", "path": "p"}}, "vendor.json: 'misc/foo' needs repo, path and ref"),
-        ({"misc/foo": {"repo": "", "path": "p", "ref": "main"}}, "vendor.json: 'misc/foo' needs repo, path and ref"),
+        (
+            {"Bad Key": {"repo": "r", "path": "p", "ref": "main"}},
+            "vendor.json: key 'Bad Key' is not <category>/<name>",
+        ),
+        (
+            {"misc/nope": {"repo": "r", "path": "p", "ref": "main"}},
+            "vendor.json: 'misc/nope' has no skill folder",
+        ),
+        (
+            {"misc/foo": {"repo": "r", "path": "p"}},
+            "vendor.json: 'misc/foo' needs repo, path and ref",
+        ),
+        (
+            {"misc/foo": {"repo": "", "path": "p", "ref": "main"}},
+            "vendor.json: 'misc/foo' needs repo, path and ref",
+        ),
         ({"misc/foo": "nope"}, "vendor.json: 'misc/foo' needs repo, path and ref"),
     ],
 )
@@ -432,7 +457,9 @@ def test_load_all_includes_manifest_problems(tmp_path):
 
 
 def git(cwd: Path, *args: str) -> str:
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True).stdout.strip()
+    return subprocess.run(
+        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
+    ).stdout.strip()
 
 
 def init_repo(path: Path) -> None:
@@ -448,10 +475,15 @@ def commit_all(path: Path, message: str) -> str:
     return git(path, "rev-parse", "HEAD")
 
 
-UPSTREAM_V1 = "---\nname: foo\ndescription: Upstream v1.\nlicense: Complete terms in LICENSE.txt\n---\n\n# Foo v1\n"
+UPSTREAM_V1 = (
+    "---\nname: foo\ndescription: Upstream v1.\n"
+    "license: Complete terms in LICENSE.txt\n---\n\n# Foo v1\n"
+)
 
 
-def make_upstream(tmp_path: Path, text: str = UPSTREAM_V1, extra: dict[str, str] | None = None) -> tuple[str, str]:
+def make_upstream(
+    tmp_path: Path, text: str = UPSTREAM_V1, extra: dict[str, str] | None = None
+) -> tuple[str, str]:
     repo = tmp_path / "upstream"
     init_repo(repo)
     skill = repo / "skills" / "foo"
@@ -470,7 +502,9 @@ def test_dump_frontmatter_round_trip():
 
 
 def test_merge_frontmatter_appends_registry_fields_last():
-    merged = registry.merge_frontmatter(UPSTREAM_V1, {"license": "MIT", "source": "https://x", "tags": ["a"]})
+    merged = registry.merge_frontmatter(
+        UPSTREAM_V1, {"license": "MIT", "source": "https://x", "tags": ["a"]}
+    )
     data, body = registry.parse_frontmatter(merged)
     assert list(data) == ["name", "description", "license", "source", "tags"]
     assert data["license"] == "MIT"
@@ -497,7 +531,11 @@ def test_remote_commit_unknown_ref(tmp_path):
 
 
 def test_replace_skill_keeps_registry_fields_and_license(tmp_path):
-    skill_dir = make_skill(tmp_path, "foo", "name: foo\ndescription: Old.\nlicense: MIT\nsource: https://x\ntags: [a]\n")
+    skill_dir = make_skill(
+        tmp_path,
+        "foo",
+        "name: foo\ndescription: Old.\nlicense: MIT\nsource: https://x\ntags: [a]\n",
+    )
     (skill_dir / "LICENSE").write_text("MIT text\n", encoding="utf-8")
     (skill_dir / "stale.md").write_text("old\n", encoding="utf-8")
     upstream = tmp_path / "up"
@@ -506,7 +544,13 @@ def test_replace_skill_keeps_registry_fields_and_license(tmp_path):
     (upstream / "reference.md").write_text("new\n", encoding="utf-8")
     registry.replace_skill(skill_dir, upstream)
     data, body = registry.parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
-    assert data == {"name": "foo", "description": "Upstream v1.", "license": "MIT", "source": "https://x", "tags": ["a"]}
+    assert data == {
+        "name": "foo",
+        "description": "Upstream v1.",
+        "license": "MIT",
+        "source": "https://x",
+        "tags": ["a"],
+    }
     assert body == "\n# Foo v1\n"
     assert (skill_dir / "LICENSE").read_text(encoding="utf-8") == "MIT text\n"
     assert (skill_dir / "reference.md").is_file()
@@ -530,7 +574,9 @@ def test_sync_skill_creates_missing_folder(tmp_path):
     root.mkdir()
     entry = {"repo": url, "path": "skills/foo", "ref": "main"}
     assert registry.sync_skill(root, "misc/foo", entry) == sha
-    data, _ = registry.parse_frontmatter((root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8"))
+    data, _ = registry.parse_frontmatter(
+        (root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8")
+    )
     assert data == {"name": "foo", "description": "Upstream v1."}
 
 
@@ -557,7 +603,9 @@ def make_vendored_repo(tmp_path: Path) -> tuple[Path, str, str]:
     root = tmp_path / "reg"
     init_repo(root)
     (root / "README.md").write_text(README, encoding="utf-8")
-    make_skill(root, "foo", "name: foo\ndescription: Old.\nlicense: MIT\nsource: https://x\ntags: [a]\n")
+    make_skill(
+        root, "foo", "name: foo\ndescription: Old.\nlicense: MIT\nsource: https://x\ntags: [a]\n"
+    )
     write_manifest_file(root, {"misc/foo": {"repo": url, "path": "skills/foo", "ref": "main"}})
     registry.main(["--root", str(root), "build"])
     commit_all(root, "vendored")
@@ -568,8 +616,16 @@ def test_cli_sync_updates_skill_manifest_and_index(tmp_path, capsys):
     root, _, sha = make_vendored_repo(tmp_path)
     assert registry.main(["--root", str(root), "sync"]) == 0
     assert capsys.readouterr().out == f"misc/foo: none -> {sha[:7]}\n"
-    data, _ = registry.parse_frontmatter((root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8"))
-    assert data == {"name": "foo", "description": "Upstream v1.", "license": "MIT", "source": "https://x", "tags": ["a"]}
+    data, _ = registry.parse_frontmatter(
+        (root / "skills" / "misc" / "foo" / "SKILL.md").read_text(encoding="utf-8")
+    )
+    assert data == {
+        "name": "foo",
+        "description": "Upstream v1.",
+        "license": "MIT",
+        "source": "https://x",
+        "tags": ["a"],
+    }
     manifest = json.loads((root / "vendor.json").read_text(encoding="utf-8"))
     assert manifest["misc/foo"]["commit"] == sha
     index = json.loads((root / "index.json").read_text(encoding="utf-8"))
@@ -584,7 +640,9 @@ def test_cli_sync_check_reports_newer_upstream(tmp_path, capsys):
     assert registry.main(["--root", str(root), "sync", "--check"]) == 0
     assert capsys.readouterr().out == ""
     upstream = tmp_path / "upstream"
-    (upstream / "skills" / "foo" / "SKILL.md").write_text(UPSTREAM_V1.replace("v1", "v2"), encoding="utf-8")
+    (upstream / "skills" / "foo" / "SKILL.md").write_text(
+        UPSTREAM_V1.replace("v1", "v2"), encoding="utf-8"
+    )
     new_sha = commit_all(upstream, "v2")
     assert registry.main(["--root", str(root), "sync", "--check"]) == 1
     assert capsys.readouterr().out == f"misc/foo: {sha[:7]} -> {new_sha[:7]}\n"
@@ -593,7 +651,9 @@ def test_cli_sync_check_reports_newer_upstream(tmp_path, capsys):
 
 def test_cli_sync_refuses_dirty_skill(tmp_path, capsys):
     root, _, _ = make_vendored_repo(tmp_path)
-    (root / "skills" / "misc" / "foo" / "SKILL.md").write_text("---\nname: foo\ndescription: edited\n---\n", encoding="utf-8")
+    (root / "skills" / "misc" / "foo" / "SKILL.md").write_text(
+        "---\nname: foo\ndescription: edited\n---\n", encoding="utf-8"
+    )
     assert registry.main(["--root", str(root), "sync"]) == 1
     assert capsys.readouterr().out == "skills/misc/foo: has uncommitted changes\n"
 
@@ -606,7 +666,10 @@ def test_cli_sync_unknown_key(tmp_path, capsys):
 
 def test_cli_sync_reports_git_failure(tmp_path, capsys):
     root, _, _ = make_vendored_repo(tmp_path)
-    write_manifest_file(root, {"misc/foo": {"repo": f"file://{tmp_path}/missing", "path": "skills/foo", "ref": "main"}})
+    write_manifest_file(
+        root,
+        {"misc/foo": {"repo": f"file://{tmp_path}/missing", "path": "skills/foo", "ref": "main"}},
+    )
     commit_all(root, "bad repo")
     assert registry.main(["--root", str(root), "sync"]) == 1
     out = capsys.readouterr().out
@@ -642,7 +705,11 @@ def test_replace_skill_keeps_registry_name(tmp_path):
 @pytest.mark.parametrize(
     "key, entry, message",
     [
-        ("misc/foo", {"repo": "r", "path": "p"}, "vendor.json: 'misc/foo' needs repo, path and ref"),
+        (
+            "misc/foo",
+            {"repo": "r", "path": "p"},
+            "vendor.json: 'misc/foo' needs repo, path and ref",
+        ),
         ("misc/foo", "nope", "vendor.json: 'misc/foo' needs repo, path and ref"),
         (
             "misc/foo",
@@ -666,14 +733,19 @@ def test_sync_entry_problems(key, entry, message):
 
 
 def test_sync_entry_problems_accepts_nested_path():
-    assert registry._sync_entry_problems("misc/foo", {"repo": "r", "path": "a/b", "ref": "main"}) == []
+    assert (
+        registry._sync_entry_problems("misc/foo", {"repo": "r", "path": "a/b", "ref": "main"}) == []
+    )
 
 
 @pytest.mark.parametrize("check", [False, True])
 @pytest.mark.parametrize(
     "manifest, message",
     [
-        ({"misc/foo": {"repo": "r", "path": "p"}}, "vendor.json: 'misc/foo' needs repo, path and ref"),
+        (
+            {"misc/foo": {"repo": "r", "path": "p"}},
+            "vendor.json: 'misc/foo' needs repo, path and ref",
+        ),
         ({"misc/foo": "nope"}, "vendor.json: 'misc/foo' needs repo, path and ref"),
         (
             {"misc/foo": {"repo": "r", "path": "../x", "ref": "main"}},

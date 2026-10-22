@@ -10,11 +10,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import yaml
 from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import NamedTuple
 
+import yaml
 
 NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 MAX_NAME = 64
@@ -259,7 +259,9 @@ def remote_commit(repo: str, ref: str) -> str:
         f"refs/tags/{ref}^{{}}",
     )
     if not output:
-        raise subprocess.CalledProcessError(1, ["git", "ls-remote"], stderr=f"ref {ref!r} not found in {repo}")
+        raise subprocess.CalledProcessError(
+            1, ["git", "ls-remote"], stderr=f"ref {ref!r} not found in {repo}"
+        )
     refs = [line.split(maxsplit=1) for line in output.splitlines() if line.strip()]
     peeled = [sha for sha, name in refs if name.endswith("^{}")]
     if peeled:
@@ -282,9 +284,7 @@ def replace_skill(skill_dir: Path, upstream_dir: Path) -> None:
     overrides = {}
     if old_skill_md.is_file():
         overrides = kept_fields(parse_frontmatter(old_skill_md.read_text(encoding="utf-8"))[0])
-    merged = merge_frontmatter(
-        (upstream_dir / "SKILL.md").read_text(encoding="utf-8"), overrides
-    )
+    merged = merge_frontmatter((upstream_dir / "SKILL.md").read_text(encoding="utf-8"), overrides)
     old_license = skill_dir / "LICENSE"
     kept_license = None
     if old_license.is_file() and not (upstream_dir / "LICENSE").exists():
@@ -369,7 +369,9 @@ def render_outputs(root: Path, today: date) -> tuple[dict[Path, str], list[str]]
     index = build_index(skills, today)
     readme_path = root / "README.md"
     try:
-        readme = splice_readme(readme_path.read_text(encoding="utf-8"), render_sections(index["skills"]))
+        readme = splice_readme(
+            readme_path.read_text(encoding="utf-8"), render_sections(index["skills"])
+        )
     except (OSError, ValueError) as exc:
         return {}, [f"README.md: {exc}"]
     index_text = json.dumps(index, indent=2, ensure_ascii=False) + "\n"
@@ -502,7 +504,9 @@ def main(argv: list[str] | None = None) -> int:
     build.add_argument("--check", action="store_true", help="fail if outputs are out of date")
     sync = sub.add_parser("sync", help="pull vendored skills from upstream per vendor.json")
     sync.add_argument("keys", nargs="*", help="<category>/<name> entries to sync; default all")
-    sync.add_argument("--check", action="store_true", help="only report entries with newer upstream commits")
+    sync.add_argument(
+        "--check", action="store_true", help="only report entries with newer upstream commits"
+    )
     args = parser.parse_args(argv)
     root = args.root.resolve()
 

@@ -35,3 +35,11 @@ python3 scripts/registry.py build --check
 ```sh
 pytest
 ```
+
+## Lint
+
+```sh
+pip install -r requirements-dev.txt
+ruff check scripts tests
+ruff format scripts tests
+```
